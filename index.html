@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Review Soal</title>
+<title>Buat &amp; Review Soal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -59,6 +59,7 @@
   .lc-btn.ghost:disabled { background: transparent; border-color: var(--line); color: #a9a9a3; }
   .lc-btn.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
   .lc-btn.ghost.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+  .lc-btn.ghost.danger:disabled { color: #a9a9a3; border-color: var(--line); }
   .lc-btn.small { padding: 8px 14px; min-height: 40px; font-size: 14px; }
   .lc-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
   .lc-err { color: var(--bad); font-weight: 500; margin: 12px 0 0; }
@@ -354,7 +355,7 @@
     prog: {},
 
     // daftar "soal saya" & admin
-    mineList: [], mineMade: 0, mineMadeThisBatch: 0, mineMax: 0, adminListData: [], adminSaved: null,
+    mineList: [], mineMade: 0, mineMadeThisBatch: 0, mineMax: 0, mineNote: null, adminListData: [], adminSaved: null,
     adminSearch: '', adminBatchFilter: 'all', adminTypeFilter: 'all', adminNote: null,
     // review yang masuk ke soal saya
     mineOverall: null, showReviewerNames: false, namesBySetting: false, orphanReviews: 0, mineOpen: {},
@@ -672,7 +673,7 @@
   /* ====== VIEW: LOGIN ====== */
   function viewLogin() {
     app.innerHTML =
-      '<div class="lc-rule"></div><h1>Review soal</h1>' +
+      '<div class="lc-rule"></div><h1>Buat &amp; Review Soal</h1>' +
       '<p class="lc-mute" style="margin:14px 0 28px">Divisi Logic &amp; Code CS. Masuk dengan ID reviewer dan kode akses pribadimu.</p>' +
       '<label class="lc-label" for="lc-id">ID reviewer</label>' +
       '<input class="lc-input" id="lc-id" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(S.id) + '">' +
@@ -1180,9 +1181,9 @@
       (S.mode === 'reviewer' ? '<div class="lc-bar"><i style="width:' + Math.round((S.batchDone / S.batchTotal) * 100) + '%"></i></div>' : '<div class="lc-bar"><i style="width:0%"></i></div>') + '</div>' +
       '<div class="lc-q">' + imgHtml(q) + rich(q.soal) + '</div>' +
       answerHtml +
-      '<div class="lc-row lc-pause"><button class="lc-btn ghost small" id="lc-exit">Keluar, lanjutkan nanti</button>' +
-      '<span class="lc-mute">Stopwatch berhenti dan dilanjutkan dari waktu sekarang saat kamu kembali. Progres disimpan di browser ini.</span></div>' +
-      '<div class="lc-actions"><button class="lc-btn" id="lc-done" disabled>Selesai mengerjakan</button><p class="lc-err" id="lc-qerr" role="alert" style="margin:8px 0 0"></p></div>';
+      '<div class="lc-actions"><button class="lc-btn" id="lc-done" disabled>Selesai mengerjakan</button><p class="lc-err" id="lc-qerr" role="alert" style="margin:8px 0 0"></p></div>' +
+      '<div class="lc-row lc-pause" style="margin-top:14px"><button class="lc-btn ghost small" id="lc-exit">Keluar, lanjutkan nanti</button>' +
+      '<span class="lc-mute">Stopwatch berhenti dan dilanjutkan dari waktu sekarang saat kamu kembali. Progres disimpan di browser ini.</span></div>';
 
     var btn = app.querySelector('#lc-done');
     S.started = false; S.stopped = false; btn.disabled = true;
@@ -1344,11 +1345,10 @@
           S.qs.shift(); S.batchDone += 1; S.choice = null;
           if (S.qs.length) enterQuestion(true); // langsung ke soal berikutnya, tanpa konfirmasi lagi
           else {
+            // Status "ada soal baru?" sudah dihitung server di respons submit,
+            // jadi halaman Selesai langsung tampil benar tanpa berkedip.
+            S.hasNewBatchAvailable = !!res.hasNewBatchAvailable;
             S.screen = 'done'; render();
-            // Refresh status singkat supaya info "Ambil soal baru" akurat.
-            api('status').then(function (st) {
-              if (st.ok) { S.hasNewBatchAvailable = !!st.hasNewBatchAvailable; if (S.screen === 'done') render(); }
-            }).catch(function () {});
           }
         } else {
           S.adminSaved = { qid: q.qid, total: res.total };
@@ -1565,8 +1565,37 @@
       (open ? q.reviews.map(reviewItem).join('') : '');
   }
 
+  // Hapus soal milik sendiri (aturan boleh/tidaknya mengikuti EDITSOAL, dicek ulang oleh server).
+  function deleteMine(qid) {
+    var q = S.mineList.filter(function (x) { return x.qid === qid; })[0];
+    var nRv = q && q.stats ? q.stats.count : 0;
+    confirmBox({
+      title: 'Hapus soal ' + qid + '?',
+      text: 'Soal dan gambarnya akan dihapus dan tidak bisa dipulihkan dari sini.',
+      detail: (nRv ? nRv + ' review yang sudah masuk untuk soal ini tidak akan tampil lagi. ' : '') +
+        'Jumlah soalmu di batch tempat soal ini dibuat akan berkurang satu.',
+      ok: 'Ya, hapus soal',
+      cancel: 'Batal',
+      danger: true,
+      onOk: function () {
+        viewLoading('Menghapus soal…');
+        api('delete', { qid: qid }).then(function (res) {
+          if (!res.ok) throw new Error(res.error || 'Gagal menghapus soal.');
+          dropProg(qid);
+          S.mineNote = { kind: 'ok', text: 'Soal ' + qid + ' sudah dihapus.' };
+          openMine();
+        }).catch(function (e) {
+          if (isHandled(e)) return;
+          S.mineNote = { kind: 'err', text: 'Soal ' + qid + ' belum terhapus: ' + e.message };
+          openMine();
+        });
+      }
+    });
+  }
+
   function viewMine() {
     var createOpen = S.role === 'admin' || S.memberCreateOpen;
+    var note = S.mineNote; S.mineNote = null;
     var canAdd = createOpen && (S.role === 'admin' || !S.mineMax || S.mineMadeThisBatch < S.mineMax);
     var rows = S.mineList.map(function (q) {
       var canEdit = q.editable;
@@ -1579,7 +1608,10 @@
         '<p class="lc-mute">' + esc(q.soal.slice(0, 90)) + (q.soal.length > 90 ? '…' : '') + '</p>' +
         '<p class="lc-mute">' + keyInfo + ' • Estimasi: ' + q.est + ' dtk • ' +
         (q.editable ? '<span class="lc-badge">Bisa diedit</span>' : '<span class="lc-badge">Terkunci</span>') + '</p>' +
-        '</div><button class="lc-btn small" data-qid="' + esc(q.qid) + '"' + (canEdit ? '' : ' disabled') + '>Edit</button></div>' +
+        '</div><div class="lc-list-actions">' +
+        '<button class="lc-btn small" data-qid="' + esc(q.qid) + '"' + (canEdit ? '' : ' disabled') + '>Edit</button>' +
+        '<button class="lc-btn ghost small danger" data-delqid="' + esc(q.qid) + '"' + (q.deletable ? '' : ' disabled') + '>Hapus</button>' +
+        '</div></div>' +
         reviewBlock(q) + '</div>';
     }).join('') || '<p class="lc-mute">Kamu belum membuat soal.</p>';
 
@@ -1622,6 +1654,9 @@
       (createOpen ? '' : '<div class="lc-notice"><p>Pembuatan soal baru sedang ditutup oleh admin.</p></div>') +
       '<div class="lc-row" style="margin:14px 0"><button class="lc-btn" id="lc-add"' + (canAdd ? '' : ' disabled') + '>+ Buat soal baru</button>' +
       '<button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
+      (note ? (note.kind === 'err'
+        ? '<p class="lc-err" role="alert">' + esc(note.text) + '</p>'
+        : '<div class="lc-notice" role="status"><p>' + esc(note.text) + '</p></div>') : '') +
       overallCard +
       rows +
       (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
@@ -1629,6 +1664,9 @@
     app.querySelector('#lc-add').onclick = function () { openCreateForm(null); };
     app.querySelectorAll('[data-qid]').forEach(function (b) {
       b.onclick = function () { openCreateForm(b.getAttribute('data-qid')); };
+    });
+    app.querySelectorAll('[data-delqid]').forEach(function (b) {
+      b.onclick = function () { deleteMine(b.getAttribute('data-delqid')); };
     });
     app.querySelectorAll('[data-toggle]').forEach(function (b) {
       b.onclick = function () {
