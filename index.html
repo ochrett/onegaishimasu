@@ -221,6 +221,17 @@
   .lc-filterrow > div { flex: 1 1 200px; min-width: 160px; }
   .lc-filterrow .lc-label { margin-top: 0; }
 
+  /* Audit log (admin) */
+  .lc-aud { border: 1px solid var(--line); border-left: 3px solid var(--ink); background: var(--paper); padding: 10px 12px; margin-bottom: 10px; }
+  .lc-aud.bad { border-left-color: var(--bad); }
+  .lc-aud-h { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+  .lc-aud-sub { font-size: 13px; color: var(--mute); margin: 2px 0 0; overflow-wrap: anywhere; }
+  .lc-aud-sum { margin: 6px 0 0; overflow-wrap: anywhere; }
+  .lc-aud details { margin-top: 6px; }
+  .lc-aud summary { cursor: pointer; font-size: 14px; font-weight: 700; }
+  .lc-aud pre { margin: 6px 0 0; padding: 8px 10px; background: var(--notice-bg); white-space: pre-wrap; overflow-wrap: anywhere;
+    font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+
   /* Pengalih mode terang/gelap (footer, di paling bawah semua halaman) */
   .lc-foot { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; justify-content: center; }
   .lc-theme { font: inherit; color: var(--ink); background: none; border: 0; cursor: pointer;
@@ -333,7 +344,7 @@
   var KEYS = ['A', 'B', 'C', 'D', 'E'];
   var TYPE_LABELS = { PG: 'Pilihan ganda saja', ISIAN: 'Isian singkat saja', KEDUANYA: 'Pilihan ganda atau isian singkat' };
   // Layar tingkat menu yang boleh "diingat" dan dibuka lagi otomatis setelah login ulang.
-  var RESUMABLE_SCREENS = { menu: 1, mine: 1, adminlist: 1, members: 1, settings: 1 };
+  var RESUMABLE_SCREENS = { menu: 1, mine: 1, adminlist: 1, members: 1, settings: 1, audit: 1 };
   var THEME_KEY = 'lc_theme';
 
   var app = document.getElementById('lc-app');
@@ -361,6 +372,9 @@
     mineOverall: null, showReviewerNames: false, namesBySetting: false, orphanReviews: 0, mineOpen: {},
     // pengaturan platform (khusus admin)
     setList: [], setVals: {}, setErr: '', setMsg: '', setBusy: false,
+    // audit log (khusus admin)
+    auditData: null, auditQ: '', auditAction: 'all', auditMember: 'all', auditSort: 'terbaru',
+    auditLimit: 300, auditBusy: false, auditErr: '', auditReq: 0, auditTimer: null,
 
     // daftar anggota
     membersOpen: true, memData: null, memBatch: null, memSort: ['nama'], memDesc: {},
@@ -474,6 +488,7 @@
     if (S.role === 'admin') {
       if (last === 'adminlist') return openAdminList();
       if (last === 'settings') return openSettings();
+      if (last === 'audit') return openAudit();
     }
     S.screen = 'menu'; S.err = ''; render();
   }
@@ -859,6 +874,12 @@
         '<div class="lc-notice"><p>Progres tim sedang ditutup oleh admin.</p></div></div>';
     }
 
+    var auditCard = isAdmin
+      ? '<div class="lc-card"><h3>Audit log</h3>' +
+        '<p>Riwayat aktivitas semua akun: login, logout, buat/edit/hapus soal, review, dan perubahan pengaturan. Khusus admin.</p>' +
+        '<button class="lc-btn" id="lc-audit">Buka audit log</button></div>'
+      : '';
+
     var settingsCard = isAdmin
       ? '<div class="lc-card"><h3>Pengaturan platform</h3>' +
         '<p>Atur batch aktif, jumlah soal, batas estimasi waktu, rentang penilaian rubrik, tipe soal yang boleh dibuat anggota, dan lain-lain langsung dari sini. ' +
@@ -876,7 +897,7 @@
       '<div class="lc-titlerow"><h2>' + esc(greetingWord()) + ', ' + esc(S.nama || S.id) + '</h2><h2>Menu</h2></div>' +
       '<div class="lc-batchbig"><span>Batch yang sedang aktif</span><b>' + esc(batchName(S.currentBatch)) + '</b></div>' +
       trialNotice +
-      '<div style="margin-top:18px">' + reviewerCard + soalCard + membersCard + settingsCard + '</div>' +
+      '<div style="margin-top:18px">' + reviewerCard + soalCard + membersCard + auditCard + settingsCard + '</div>' +
       (flash ? '<p class="lc-err" role="alert">' + esc(flash) + '</p>' : '') +
       (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
 
@@ -887,6 +908,7 @@
     // Masuk dari menu = mulai bersih (pencarian & filter direset).
     var al = app.querySelector('#lc-adminlist'); if (al) al.onclick = function () { openAdminList(true); };
     var pt = app.querySelector('#lc-participate'); if (pt) pt.onchange = function () { S.adminParticipate = pt.checked; };
+    var au = app.querySelector('#lc-audit'); if (au) au.onclick = openAudit;
     var sg = app.querySelector('#lc-settings'); if (sg) sg.onclick = openSettings;
     var mm = app.querySelector('#lc-members'); if (mm) mm.onclick = openMembers;
   }
@@ -1397,6 +1419,143 @@
     bindNav();
   }
 
+  /* ====== AUDIT LOG (khusus admin) ======
+     Pencarian, filter, dan urutan diproses di server. Yang ditampilkan hanya isi daftar
+     (kolom pencarian dan dropdown tidak dirender ulang, jadi fokus keyboard tidak loncat). */
+  var AUDIT_SORTS = [
+    ['terbaru', 'Terbaru dulu'], ['terlama', 'Terlama dulu'],
+    ['anggota', 'ID anggota A–Z'], ['aksi', 'Aksi A–Z'], ['soal', 'ID soal A–Z']
+  ];
+  var AUDIT_BAD = { 'Hapus soal': 1, 'Login gagal': 1 };
+
+  function auditPayload() {
+    return { q: S.auditQ, action: S.auditAction, member: S.auditMember, sort: S.auditSort, limit: S.auditLimit };
+  }
+  function auditFilterActive() {
+    return !!S.auditQ.trim() || S.auditAction !== 'all' || S.auditMember !== 'all' || S.auditSort !== 'terbaru';
+  }
+
+  function openAudit() {
+    S.err = ''; S.auditErr = '';
+    S.auditQ = ''; S.auditAction = 'all'; S.auditMember = 'all'; S.auditSort = 'terbaru'; S.auditLimit = 300;
+    rememberScreen('audit');
+    viewLoading('Memuat audit log…');
+    var req = ++S.auditReq;
+    api('audit_list', auditPayload()).then(function (res) {
+      if (req !== S.auditReq) return;
+      if (!res.ok) throw new Error(res.error || 'Gagal memuat audit log.');
+      S.auditData = res; S.auditBusy = false;
+      S.screen = 'audit'; render();
+    }).catch(function (e) {
+      if (isHandled(e)) return;
+      S.err = e.message; S.screen = 'menu'; loadStatus();
+    });
+  }
+
+  function fetchAudit() {
+    if (S.screen !== 'audit') return;
+    var req = ++S.auditReq;
+    S.auditBusy = true; S.auditErr = '';
+    paintAudit();
+    api('audit_list', auditPayload()).then(function (res) {
+      if (req !== S.auditReq) return; // ada permintaan yang lebih baru
+      S.auditBusy = false;
+      if (!res.ok) throw new Error(res.error || 'Gagal memuat audit log.');
+      S.auditData = res;
+      paintAudit();
+    }).catch(function (e) {
+      if (req !== S.auditReq) return;
+      S.auditBusy = false;
+      if (isHandled(e)) return;
+      S.auditErr = e.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server.' : e.message;
+      paintAudit();
+    });
+  }
+
+  function auditItemHtml(x) {
+    return '<div class="lc-aud' + (AUDIT_BAD[x.aksi] ? ' bad' : '') + '">' +
+      '<div class="lc-aud-h"><div><strong>' + esc(x.aksi) + '</strong>' +
+      (x.qid ? ' <span class="lc-badge">' + esc(x.qid) + '</span>' : '') + '</div>' +
+      '<span class="lc-aud-sub">' + esc(x.ts) + '</span></div>' +
+      '<p class="lc-aud-sub">' + esc(x.member) + (x.nama ? ' — ' + esc(x.nama) : '') +
+      (x.role === 'admin' ? ' <span class="lc-badge">Admin</span>' : '') + '</p>' +
+      '<p class="lc-aud-sum">' + esc(x.ringkasan) + '</p>' +
+      (x.detail ? '<details><summary>Lihat detail</summary><pre>' + esc(x.detail) + '</pre></details>' : '') +
+      '</div>';
+  }
+
+  // Isi ulang hanya bagian info + daftar (bukan seluruh layar).
+  function paintAudit() {
+    var d = S.auditData, box = app.querySelector('#lc-aud-list');
+    if (!d || !box) return;
+    var info = app.querySelector('#lc-aud-info'), more = app.querySelector('#lc-aud-more');
+    var txt = S.auditBusy ? 'Memuat…' :
+      d.matched + ' dari ' + d.total + ' log cocok' + (d.shown < d.matched ? ' (' + d.shown + ' teratas ditampilkan)' : '') + '.';
+    info.innerHTML = '<span class="lc-mute" role="status">' + esc(txt) + '</span>' +
+      (auditFilterActive() ? '<button type="button" class="lc-btn ghost small" id="lc-aud-reset">Reset pencarian dan filter</button>' : '') +
+      (S.auditErr ? '<p class="lc-err" role="alert" style="width:100%">' + esc(S.auditErr) + '</p>' : '');
+    var rs = info.querySelector('#lc-aud-reset');
+    if (rs) rs.onclick = function () {
+      S.auditQ = ''; S.auditAction = 'all'; S.auditMember = 'all'; S.auditSort = 'terbaru'; S.auditLimit = 300;
+      app.querySelector('#lc-aud-search').value = '';
+      app.querySelector('#lc-aud-action').value = 'all';
+      app.querySelector('#lc-aud-member').value = 'all';
+      app.querySelector('#lc-aud-sort').value = 'terbaru';
+      fetchAudit();
+    };
+    box.className = S.auditBusy ? 'lc-mem-dim' : '';
+    box.innerHTML = d.items.length ? d.items.map(auditItemHtml).join('')
+      : '<p class="lc-mute">' + (d.total ? 'Tidak ada log yang cocok dengan pencarian atau filter.' : 'Belum ada log.') + '</p>';
+    more.innerHTML = (!S.auditBusy && d.shown < d.matched && S.auditLimit < 1000)
+      ? '<button type="button" class="lc-btn ghost" id="lc-aud-morebtn">Tampilkan lebih banyak</button>' : '';
+    var mb = more.querySelector('#lc-aud-morebtn');
+    if (mb) mb.onclick = function () { S.auditLimit = Math.min(1000, S.auditLimit + 300); fetchAudit(); };
+  }
+
+  function viewAudit() {
+    var d = S.auditData || { actions: [], members: [] };
+    var actOpts = '<option value="all">Semua aksi</option>' + (d.actions || []).map(function (a) {
+      return '<option value="' + esc(a.value) + '"' + (S.auditAction === a.value ? ' selected' : '') + '>' + esc(a.label) + '</option>';
+    }).join('');
+    var memOpts = '<option value="all">Semua anggota</option>' + (d.members || []).map(function (id) {
+      return '<option value="' + esc(id) + '"' + (S.auditMember === id ? ' selected' : '') + '>' + esc(id) + '</option>';
+    }).join('');
+    var sortOpts = AUDIT_SORTS.map(function (o) {
+      return '<option value="' + o[0] + '"' + (S.auditSort === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
+    }).join('');
+
+    app.innerHTML = navBar() +
+      '<div class="lc-rule"></div><h2>Audit log</h2>' +
+      '<p class="lc-mute" style="margin-top:10px">Riwayat aktivitas semua akun, tersimpan di tab <strong>AuditLog</strong> pada spreadsheet. ' +
+      'Kode akses dan isi catatan review tidak pernah dicatat.</p>' +
+      '<div class="lc-search"><label class="lc-label" for="lc-aud-search">Cari log</label>' +
+      '<input class="lc-input" id="lc-aud-search" type="search" placeholder="Cari ID anggota, nama, ID soal, ringkasan, atau detail…" value="' + esc(S.auditQ) + '" autocomplete="off">' +
+      '<div class="lc-filterrow">' +
+      '<div><label class="lc-label" for="lc-aud-action">Aksi</label><select class="lc-select" id="lc-aud-action">' + actOpts + '</select></div>' +
+      '<div><label class="lc-label" for="lc-aud-member">Anggota</label><select class="lc-select" id="lc-aud-member">' + memOpts + '</select></div>' +
+      '<div><label class="lc-label" for="lc-aud-sort">Urutkan</label><select class="lc-select" id="lc-aud-sort">' + sortOpts + '</select></div>' +
+      '</div>' +
+      '<div class="lc-row" style="margin-top:8px" id="lc-aud-info"></div></div>' +
+      '<div id="lc-aud-list"></div>' +
+      '<div class="lc-row" id="lc-aud-more" style="margin:6px 0 10px"></div>' +
+      '<div class="lc-row" style="margin-top:10px"><button class="lc-btn ghost" id="lc-aud-reload">Muat ulang</button>' +
+      '<button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>';
+    bindNav();
+
+    app.querySelector('#lc-aud-search').oninput = function (e) {
+      S.auditQ = e.target.value; S.auditLimit = 300;
+      clearTimeout(S.auditTimer);
+      S.auditTimer = setTimeout(fetchAudit, 350); // tunggu berhenti mengetik
+    };
+    app.querySelector('#lc-aud-action').value = S.auditAction;
+    app.querySelector('#lc-aud-member').value = S.auditMember;
+    app.querySelector('#lc-aud-action').onchange = function (e) { S.auditAction = e.target.value; S.auditLimit = 300; fetchAudit(); };
+    app.querySelector('#lc-aud-member').onchange = function (e) { S.auditMember = e.target.value; S.auditLimit = 300; fetchAudit(); };
+    app.querySelector('#lc-aud-sort').onchange = function (e) { S.auditSort = e.target.value; S.auditLimit = 300; fetchAudit(); };
+    app.querySelector('#lc-aud-reload').onclick = fetchAudit;
+    paintAudit();
+  }
+
   /* ====== PENGATURAN PLATFORM (khusus admin) ======
      Daftar setting, label, dan batas nilainya dikirim oleh server (SETTINGS di Code.gs),
      jadi kalau ada setting baru di backend, halaman ini ikut menampilkannya sendiri. */
@@ -1625,7 +1784,7 @@
     // Baris Review yang soalnya sudah tidak ada di tab Soal/SoalIsian (mis. barisnya dihapus)
     var orphanNote = S.orphanReviews
       ? '<div class="lc-notice" style="margin-top:14px"><p>' + S.orphanReviews +
-        ' review lain tercatat atas namamu, tapi soalnya sudah tidak ada di tab Soal/SoalIsian ' +
+        ' review lain tercatat atas namamu, tapi soalnya sudah tidak ada di tab Soal_PG/Soal_IS ' +
         '(barisnya terhapus atau dikosongkan), jadi tidak ikut dihitung di sini. Hubungi admin kalau ini tidak seharusnya terjadi.</p></div>'
       : '';
     var overallCard = '';
@@ -2098,6 +2257,7 @@
     if (S.screen === 'create') return viewCreate();
     if (S.screen === 'adminlist') return viewAdminList();
     if (S.screen === 'settings') return viewSettings();
+    if (S.screen === 'audit') return viewAudit();
     if (S.screen === 'members') return viewMembers();
   }
 
