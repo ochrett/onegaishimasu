@@ -1431,7 +1431,7 @@
   var AUDIT_BAD = { 'Hapus soal': 1, 'Login gagal': 1 };
 
   function auditPayload() {
-    return { q: S.auditQ, action: S.auditAction, member: S.auditMember, sort: S.auditSort, limit: S.auditLimit };
+    return { q: S.auditQ, filterAction: S.auditAction, member: S.auditMember, sort: S.auditSort, limit: S.auditLimit };
   }
   function auditFilterActive() {
     return !!S.auditQ.trim() || S.auditAction !== 'all' || S.auditMember !== 'all' || S.auditSort !== 'terbaru';
