@@ -1450,7 +1450,8 @@
       S.screen = 'audit'; render();
     }).catch(function (e) {
       if (isHandled(e)) return;
-      S.err = e.message; S.screen = 'menu'; loadStatus();
+      S.flash = 'Audit log gagal dibuka: ' + e.message;
+      S.screen = 'menu'; loadStatus();
     });
   }
 
