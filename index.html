@@ -1,0 +1,2076 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Review Soal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<script>
+  /* Terapkan tema SEBELUM halaman digambar, supaya tidak ada kedipan terang saat mode gelap aktif.
+     Bawaan: terang (juga di halaman login). Pilihan tersimpan di perangkat ini. */
+  try {
+    document.documentElement.setAttribute('data-theme', localStorage.getItem('lc_theme') === 'dark' ? 'dark' : 'light');
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+</script>
+<style>
+  html { color-scheme: light; }
+  html, body { margin: 0; padding: 0; min-height: 100%; background: #f2f2f0; }
+  .lc-root, .lc-root * { box-sizing: border-box; }
+  .lc-root {
+    --bg: #f2f2f0; --paper: #fafaf8; --ink: #111111; --mute: #6c6c66; --line: #d6d6d0;
+    --good: #1f6b3a; --bad: #a3271f; --warn: #a35b00;
+    --notice-bg: #ebebe7; --key-bg: #e9f5ee; --completed-bg: #fbeedd; --na-bg: #fbe9e7;
+    --shadow: rgba(17,17,17,.6); --imgbg: #ffffff;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    color: var(--ink); background: var(--bg);
+    width: 100%; min-height: 100vh; padding: clamp(16px, 4vw, 44px);
+    line-height: 1.55; font-size: 16px;
+    display: flex; flex-direction: column;
+  }
+  .lc-wrap { max-width: 720px; width: 100%; margin: 0 auto; flex: 1 0 auto; display: flex; flex-direction: column; }
+  #lc-app { flex: 1 0 auto; min-width: 0; }
+  .lc-root h1, .lc-root h2 { font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; margin: 0; line-height: 1.1; letter-spacing: -0.01em; }
+  .lc-root h1 { font-size: clamp(34px, 7vw, 56px); }
+  .lc-root h2 { font-size: clamp(24px, 4.5vw, 32px); }
+  .lc-root h3 { font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; font-size: 20px; margin: 0 0 6px; }
+  .lc-root p { margin: 0 0 .8em; }
+  .lc-rule { width: 56px; height: 4px; background: var(--ink); margin: 0 0 18px; }
+  .lc-mute { color: var(--mute); font-size: 14px; }
+
+  .lc-input, .lc-textarea, .lc-select {
+    width: 100%; font: inherit; color: inherit; background: var(--paper);
+    border: 1.5px solid var(--ink); border-radius: 0; padding: 12px 14px;
+  }
+  .lc-textarea { min-height: 84px; resize: vertical; }
+  .lc-select { appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%), linear-gradient(135deg, var(--ink) 50%, transparent 50%); background-position: calc(100% - 20px) center, calc(100% - 15px) center; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 36px; }
+  .lc-input:focus-visible, .lc-textarea:focus-visible, .lc-btn:focus-visible, .lc-select:focus-visible,
+  .lc-theme:focus-visible, .lc-opt input:focus-visible + span, .lc-range:focus-visible { outline: 3px solid #2b6df6; outline-offset: 2px; }
+
+  .lc-btn {
+    font: inherit; font-weight: 700; cursor: pointer; padding: 13px 22px;
+    background: var(--ink); color: var(--paper); border: 1.5px solid var(--ink); border-radius: 0;
+  }
+  .lc-btn:disabled { background: #c9c9c3; border-color: #c9c9c3; color: #8b8b85; cursor: not-allowed; }
+  .lc-btn.ghost { background: transparent; color: var(--ink); }
+  .lc-btn.ghost:disabled { background: transparent; border-color: var(--line); color: #a9a9a3; }
+  .lc-btn.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+  .lc-btn.ghost.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+  .lc-btn.small { padding: 8px 14px; min-height: 40px; font-size: 14px; }
+  .lc-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .lc-err { color: var(--bad); font-weight: 500; margin: 12px 0 0; }
+
+  /* Nav / kartu / lencana */
+  .lc-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 10px; flex-wrap: wrap; }
+  .lc-badge { font-size: 12px; padding: 3px 9px; border: 1px solid var(--ink); display: inline-block; white-space: nowrap; }
+  .lc-card { border: 1.5px solid var(--ink); background: var(--paper); padding: 18px; margin-bottom: 18px; }
+  .lc-card h3 { margin-bottom: 4px; }
+  .lc-card-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  .lc-card-h h3 { margin: 0; }
+  .lc-status-badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; padding: 3px 9px; border: 1.5px solid; vertical-align: middle; white-space: nowrap; }
+  .lc-status-badge.available { color: var(--good); border-color: var(--good); background: var(--key-bg); }
+  .lc-status-badge.completed { color: var(--warn); border-color: var(--warn); background: var(--completed-bg); }
+  .lc-status-badge.na { color: var(--bad); border-color: var(--bad); background: var(--na-bg); }
+  .lc-greet { font-size: 14px; color: var(--mute); margin: 0 0 10px; }
+  .lc-titlerow { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .lc-notice { border-left: 4px solid var(--ink); background: var(--notice-bg); padding: 10px 14px; margin: 0 0 14px; font-size: 15px; }
+  .lc-notice p { margin: 0; }
+  .lc-list-item {
+    border: 1px solid var(--line); padding: 12px 14px; margin-bottom: 10px;
+    display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap;
+  }
+  .lc-list-item .lc-meta { flex: 1 1 220px; min-width: 0; }
+  .lc-list-item .lc-meta p { margin: 0 0 4px; overflow-wrap: anywhere; }
+  .lc-list-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .lc-toggle { display: flex; align-items: center; gap: 10px; }
+  .lc-toggle input { width: 20px; height: 20px; }
+  .lc-fieldset { margin-bottom: 18px; }
+  .lc-label { display: block; font-weight: 700; margin: 6px 0 6px; }
+  .lc-hintline { margin: 4px 0 0; }
+
+  /* Stopwatch */
+  .lc-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 14px; }
+  .lc-sw { font-family: 'DM Serif Display', Georgia, serif; font-size: clamp(44px, 10vw, 72px); line-height: 1; font-variant-numeric: tabular-nums; }
+  .lc-bar { height: 4px; background: var(--line); margin-bottom: 28px; }
+  .lc-bar > i { display: block; height: 100%; background: var(--ink); transition: width .3s; }
+
+  /* Soal */
+  .lc-q { background: var(--paper); border: 1.5px solid var(--ink); padding: clamp(16px, 3vw, 28px); margin-bottom: 20px; }
+  .lc-q p { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .lc-code { margin: 0 0 .9em; padding: 12px 14px; background: var(--notice-bg); border-left: 4px solid var(--ink);
+    font: 14px/1.5 ui-monospace, Menlo, Consolas, monospace; overflow-x: auto; white-space: pre; }
+  .lc-opt { display: block; position: relative; margin-bottom: 10px; cursor: pointer; }
+  .lc-opt input { position: absolute; opacity: 0; }
+  .lc-opt span { display: flex; gap: 14px; padding: 12px 14px; border: 1.5px solid var(--line); background: var(--paper); overflow-wrap: anywhere; white-space: pre-wrap; }
+  .lc-opt b { min-width: 1.4em; }
+  .lc-opt input:checked + span { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+  .lc-opt input:disabled + span { opacity: .4; cursor: not-allowed; }
+
+  /* Review */
+  .lc-result { padding: 14px 16px; border: 1.5px solid var(--ink); margin-bottom: 20px; background: var(--paper); }
+  .lc-result strong.ok { color: var(--good); } .lc-result strong.no { color: var(--bad); }
+  .lc-details { margin-bottom: 24px; }
+  .lc-details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+  .lc-opt-static { padding: 8px 12px; border: 1px solid var(--line); margin-top: 6px; background: var(--paper); white-space: pre-wrap; }
+  .lc-opt-static.key { border-color: var(--good); border-width: 2px; }
+  .lc-crit { border-top: 1.5px solid var(--line); padding: 16px 0; }
+  .lc-crit-h { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .lc-crit-h strong { font-size: 17px; }
+  .lc-val { font-family: 'DM Serif Display', Georgia, serif; font-size: 30px; font-variant-numeric: tabular-nums; min-width: 2.6em; text-align: right; }
+  .lc-val.empty { color: #b3b3ad; }
+  .lc-range { width: 100%; margin: 10px 0 0; accent-color: #111; height: 28px; }
+  .lc-total { display: flex; justify-content: space-between; align-items: baseline; border-top: 3px solid var(--ink); padding: 14px 0 20px; }
+  .lc-total .lc-val { font-size: 40px; }
+  .lc-pause { margin-top: 6px; }
+  .lc-pause .lc-mute { flex: 1 1 200px; margin: 0; }
+
+  .lc-center { text-align: center; padding: 60px 0; }
+  .lc-spin { width: 28px; height: 28px; border: 3px solid var(--line); border-top-color: var(--ink); border-radius: 50%; margin: 0 auto 16px; animation: lcspin .8s linear infinite; }
+  @keyframes lcspin { to { transform: rotate(360deg); } }
+
+  /* Gambar soal */
+  .lc-imgs { margin-top: 12px; }
+  .lc-fig { margin: 0 0 14px; }
+  .lc-img { display: block; max-width: 100%; height: auto; border: 1.5px solid var(--line); background: var(--imgbg); cursor: zoom-in; }
+  .lc-imgload, .lc-imgerr { padding: 18px; border: 1.5px dashed var(--line); color: var(--mute); }
+  .lc-imgerr .lc-btn { margin-left: 8px; min-height: 40px; padding: 8px 14px; }
+  .lc-zoom { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.92); overflow: auto; padding: 60px 12px 24px; -webkit-overflow-scrolling: touch; }
+  .lc-zoom img { display: block; width: max(100%, 900px); height: auto; background: #fff; }
+  .lc-zoom .lc-btn { position: fixed; top: 10px; right: 10px; background: #fff; color: #111; border-color: #fff; }
+
+  /* Upload gambar (form buat soal) */
+  .lc-thumbs { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+  .lc-thumb { position: relative; width: 88px; height: 88px; flex: 0 0 auto; }
+  .lc-thumb img { width: 100%; height: 100%; object-fit: cover; border: 1.5px solid var(--ink); display: block; background: #eee; }
+  .lc-thumb button { position: absolute; top: -9px; right: -9px; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--bad); color: #fff; border: 2px solid var(--paper); font-size: 14px; line-height: 1; cursor: pointer; padding: 0; }
+  .lc-filebtn { display: inline-block; }
+  .lc-filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+
+  /* Dialog konfirmasi */
+  .lc-modal { position: fixed; inset: 0; z-index: 9000; background: var(--shadow);
+    display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .lc-modal-box { background: var(--paper); border: 1.5px solid var(--ink); padding: 22px;
+    width: 100%; max-width: 460px; max-height: 90vh; overflow: auto; }
+  .lc-modal-box .lc-row { margin-top: 18px; }
+
+  /* Batch aktif di menu utama */
+  .lc-batchbig { border: 1.5px solid var(--ink); background: var(--ink); color: var(--paper);
+    padding: 14px 18px; margin: 16px 0 0; display: flex; justify-content: space-between;
+    align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .lc-batchbig b { font-family: 'DM Serif Display', Georgia, serif; font-weight: 400;
+    font-size: clamp(30px, 7vw, 46px); line-height: 1; font-variant-numeric: tabular-nums; }
+  .lc-batchbig span { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; opacity: .85; }
+
+  /* Review yang masuk ke soal saya */
+  .lc-stats { display: flex; gap: 22px; flex-wrap: wrap; margin: 6px 0 0; }
+  .lc-stat { min-width: 96px; }
+  .lc-stat b { display: block; font-family: 'DM Serif Display', Georgia, serif; font-weight: 400;
+    font-size: 28px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .lc-stat span { font-size: 13px; color: var(--mute); }
+  .lc-rv { border: 1px solid var(--line); border-left: 3px solid var(--ink); background: var(--paper);
+    padding: 10px 12px; margin: 8px 0 0; }
+  .lc-rv-h { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+  .lc-rv-score { font-family: 'DM Serif Display', Georgia, serif; font-size: 22px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .lc-rv-sub { font-size: 13px; color: var(--mute); margin: 2px 0 0; }
+  .lc-rv-note { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; }
+  .lc-rv-empty { color: var(--mute); font-size: 14px; margin: 8px 0 0; }
+  .lc-mine-item { display: block; }
+  .lc-mine-item .lc-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+
+  /* Form pengaturan platform (admin) */
+  .lc-set { border-top: 1px solid var(--line); padding: 14px 0; }
+  .lc-set:first-of-type { border-top: 0; }
+  .lc-set .lc-label { margin-top: 0; }
+  .lc-set .lc-input, .lc-set .lc-select { max-width: 280px; }
+  .lc-set .lc-mute { margin: 4px 0 0; }
+  .lc-setnum { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .lc-setnum .lc-range { flex: 1 1 200px; margin: 0; min-width: 160px; }
+
+  /* Anggota: tabel daftar tim */
+  .lc-tablewrap { overflow-x: auto; border: 1.5px solid var(--ink); background: var(--paper); margin: 14px 0 18px; }
+  .lc-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .lc-table th { text-align: left; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute);
+    padding: 10px 12px; border-bottom: 1.5px solid var(--ink); white-space: nowrap; }
+  .lc-table td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .lc-table tr:last-child td { border-bottom: 0; }
+  .lc-table tr.me td { background: var(--notice-bg); }
+  .lc-mname { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; overflow-wrap: anywhere; }
+  .lc-mstat { margin-top: 4px; font-size: 13px; }
+  .lc-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #a9a9a3; margin-right: 6px; }
+  .lc-dot.on { background: #1f9d4c; box-shadow: 0 0 0 3px rgba(31,157,76,.2); }
+  .lc-on { color: var(--good); font-weight: 700; }
+  .lc-off { color: var(--mute); }
+  .lc-yes { color: var(--good); }
+  .lc-no { color: var(--bad); }
+  .lc-sortrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 0; border-top: 1px solid var(--line); }
+  .lc-mem-dim { opacity: .55; transition: opacity .2s; }
+  .lc-mem-toprow { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  .lc-mem-batchbox, .lc-mem-sortbox { flex: 1 1 220px; min-width: 200px; }
+  .lc-mem-batchbox .lc-select { max-width: 280px; }
+
+  /* Pencarian & filter daftar soal (admin) */
+  .lc-search { margin: 14px 0; }
+  .lc-filterrow { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
+  .lc-filterrow > div { flex: 1 1 200px; min-width: 160px; }
+  .lc-filterrow .lc-label { margin-top: 0; }
+
+  /* Pengalih mode terang/gelap (footer, di paling bawah semua halaman) */
+  .lc-foot { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; justify-content: center; }
+  .lc-theme { font: inherit; color: var(--ink); background: none; border: 0; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 8px; touch-action: manipulation; }
+  .lc-track { position: relative; flex: none; width: 48px; height: 26px; border: 1.5px solid var(--ink); background: var(--paper); transition: background .2s; }
+  .lc-track i { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; background: var(--ink); transition: transform .2s, background .2s; }
+  .lc-theme[aria-checked="true"] .lc-track { background: var(--ink); }
+  .lc-theme[aria-checked="true"] .lc-track i { transform: translateX(23px); background: var(--paper); }
+
+  /* ====== Mobile & sentuh ====== */
+  .lc-root { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+  .lc-btn, .lc-opt, .lc-range { touch-action: manipulation; }
+  .lc-btn { min-height: 48px; }
+  .lc-btn.small { min-height: 40px; }
+  .lc-opt span { min-height: 52px; align-items: center; padding: 14px; }
+  .lc-stick { position: sticky; top: 0; z-index: 6; background: var(--bg); padding-top: 8px; }
+  .lc-actions { margin-top: 20px; }
+
+  .lc-range { -webkit-appearance: none; appearance: none; height: 44px; background: transparent; touch-action: pan-y; }
+  .lc-range::-webkit-slider-runnable-track { height: 8px; background: var(--line); }
+  .lc-range::-webkit-slider-thumb { -webkit-appearance: none; width: 32px; height: 32px; margin-top: -12px;
+    background: var(--ink); border: 3px solid var(--paper); box-shadow: 0 0 0 1.5px var(--ink); border-radius: 50%; }
+  .lc-range::-moz-range-track { height: 8px; background: var(--line); }
+  .lc-range::-moz-range-thumb { width: 26px; height: 26px; background: var(--ink); border: 3px solid var(--paper); border-radius: 50%; }
+
+  /* ====== Mode gelap: hanya aktif kalau pengguna menyalakannya lewat pengalih di footer ====== */
+  html[data-theme="dark"] { color-scheme: dark; }
+  html[data-theme="dark"], html[data-theme="dark"] body { background: #161614; }
+  html[data-theme="dark"] .lc-root {
+    --bg: #161614; --paper: #1f1f1c; --ink: #eeeee8; --mute: #9a9a92; --line: #3a3a35;
+    --good: #4fbf7a; --bad: #e2685f; --warn: #e8a24a;
+    --notice-bg: #2a2a26; --key-bg: #173425; --completed-bg: #3a2c12; --na-bg: #3a1e1b;
+    --shadow: rgba(0,0,0,.75); --imgbg: #f2f2f0;
+  }
+  html[data-theme="dark"] .lc-root .lc-btn:disabled { background: #3a3a35; border-color: #3a3a35; color: #6c6c66; }
+  html[data-theme="dark"] .lc-root .lc-btn.ghost:disabled { background: transparent; border-color: var(--line); color: #6c6c66; }
+  html[data-theme="dark"] .lc-root .lc-btn.danger { color: #161614; }
+  html[data-theme="dark"] .lc-root .lc-btn.ghost.danger { color: var(--bad); }
+  html[data-theme="dark"] .lc-root .lc-opt input:checked + span { color: var(--bg); }
+  html[data-theme="dark"] .lc-root .lc-batchbig { color: var(--bg); }
+  html[data-theme="dark"] .lc-root .lc-thumb button { border-color: var(--paper); color: #161614; }
+
+  @media (max-width: 600px) {
+    .lc-root { padding: 8px 14px 24px; }
+    .lc-root h1 { font-size: 36px; }
+    .lc-root h2 { font-size: 22px; }
+    .lc-top { align-items: center; margin-bottom: 8px; }
+    .lc-top .lc-mute { display: none; }
+    .lc-sw { font-size: 44px; }
+    .lc-bar { margin-bottom: 14px; }
+    .lc-q { padding: 16px; }
+    .lc-val { font-size: 26px; }
+    .lc-total .lc-val { font-size: 32px; }
+    .lc-row .lc-btn { flex: 1 1 auto; }
+    .lc-table th, .lc-table td { padding: 10px 8px; }
+    .lc-table { font-size: 14px; }
+    .lc-actions { position: sticky; bottom: 0; z-index: 5; background: var(--bg);
+      border-top: 1.5px solid var(--ink); margin: 16px -14px 0;
+      padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); }
+    .lc-actions .lc-btn { width: 100%; }
+    .lc-list-actions { width: 100%; }
+    .lc-list-actions .lc-btn { flex: 1 1 auto; }
+    .lc-modal { align-items: flex-end; padding: 0; }
+    .lc-modal-box { max-width: none; border-left: 0; border-right: 0; border-bottom: 0;
+      padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lc-spin { animation-duration: 3s; } .lc-bar > i { transition: none; }
+    .lc-track, .lc-track i { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="lc-root">
+  <div class="lc-wrap">
+    <div id="lc-app"></div>
+    <footer class="lc-foot">
+      <button type="button" class="lc-theme" id="lc-theme" role="switch" aria-checked="false">
+        <span>Mode gelap</span>
+        <span class="lc-track" aria-hidden="true"><i></i></span>
+      </button>
+    </footer>
+  </div>
+</div>
+
+
+<script>
+(function () {
+  /* ====== KONFIGURASI ======
+     Nilai di bawah ini harus sama dengan CFG di Code.gs. Kalau salah satu
+     diubah di backend, ubah juga di sini. */
+  var CONFIG = {
+    API_URL: 'https://script.google.com/macros/s/AKfycbwnoi2IwUVP-eWp-3SKukgd1qOV-FPKz3f4BORG6betL_RKHwdTnVbZu2eorgPv6KpF/exec', // https://script.google.com/macros/s/XXXX/exec
+    TIME_TOLERANCE: 0.10,
+    MAX_IMAGES: 3,
+    MAX_IMAGE_BYTES: 700 * 1024,
+    IMAGE_MAX_WIDTH: 1600,
+    MIN_EST: 10,
+    MAX_EST: 3600,
+    RUBRIC_MIN: 0,
+    RUBRIC_MAX: 100
+  };
+
+  var RUBRIC = [
+    { k: 'c',  name: 'Correctness', sub: 'Kebenaran', desc: 'Keakuratan logika, dan sampel penelusuran kode (code tracing Pascal).' },
+    { k: 'cl', name: 'Clarity',     sub: 'Kejelasan', desc: 'Bahasa tidak ambigu, instruksi jelas, dan sesuai kaidah tata bahasa.' },
+    { k: 'cx', name: 'Complexity',  sub: 'Bobot kesulitan', desc: 'Kesesuaian tingkat kerumitan logika dengan target babak.' },
+    { k: 'i',  name: 'Information', sub: 'Kelengkapan', desc: 'Semua petunjuk dan informasi soal lengkap.' }
+  ];
+  var KEYS = ['A', 'B', 'C', 'D', 'E'];
+  var TYPE_LABELS = { PG: 'Pilihan ganda saja', ISIAN: 'Isian singkat saja', KEDUANYA: 'Pilihan ganda atau isian singkat' };
+  // Layar tingkat menu yang boleh "diingat" dan dibuka lagi otomatis setelah login ulang.
+  var RESUMABLE_SCREENS = { menu: 1, mine: 1, adminlist: 1, members: 1, settings: 1 };
+  var THEME_KEY = 'lc_theme';
+
+  var app = document.getElementById('lc-app');
+  var S = {
+    screen: 'login', id: '', token: '', nama: '', role: 'anggota', err: '', flash: '', busy: false,
+    theme: 'light',
+
+    // status ringkas
+    made: 0, madeThisBatch: 0, maxQuestionsPerBatch: 0, batch: 0, batchMax: 0, hasBatch: false, batchTotal: 0, batchDone: 0, currentBatch: 1,
+    hasNewBatchAvailable: true,
+    memberReviewOpen: true, memberReviewReason: '', memberCreateOpen: true, allowedTypes: 'KEDUANYA',
+
+    // sesi pengerjaan (dipakai reviewer & admin)
+    mode: 'reviewer', reviewMode: 'rate', adminParticipate: true,
+    qs: [], choice: null, key: '', est: 0, correct: false, actual: 0, ratings: {}, note: '',
+    started: false, stopped: false, t0: 0, base: 0, timer: null, img: {}, imgP: {},
+
+    // progres tersimpan per soal (jeda / lanjutkan nanti): { qid: { elapsed, choice, checked, ratings, note } }
+    prog: {},
+
+    // daftar "soal saya" & admin
+    mineList: [], mineMade: 0, mineMadeThisBatch: 0, mineMax: 0, adminListData: [], adminSaved: null,
+    adminSearch: '', adminBatchFilter: 'all', adminTypeFilter: 'all', adminNote: null,
+    // review yang masuk ke soal saya
+    mineOverall: null, showReviewerNames: false, namesBySetting: false, orphanReviews: 0, mineOpen: {},
+    // pengaturan platform (khusus admin)
+    setList: [], setVals: {}, setErr: '', setMsg: '', setBusy: false,
+
+    // daftar anggota
+    membersOpen: true, memData: null, memBatch: null, memSort: ['nama'], memDesc: {},
+    memBusy: false, memErr: '', memReq: 0, memTimer: null,
+
+    // form buat/ubah soal
+    editingQid: null, formOrigin: 'mine', formCreator: '', formBatch: 0,
+    formType: 'pg', formSoal: '', formOpts: { A: '', B: '', C: '', D: '', E: '' }, formAnswer: '',
+    formAnswers: '', formCaseSensitive: false,
+    formEst: '', formImagesKeep: [], formImagesNew: [], formBusy: false, formErr: ''
+  };
+
+  try {
+    S.token = sessionStorage.getItem('lc_token') || '';
+    S.id = sessionStorage.getItem('lc_id') || '';
+  } catch (e) {}
+
+  /* ====== UTIL ====== */
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fmt(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function timeScore(actual, est) {
+    if (!est || est <= 0) return 0;
+    var dev = Math.abs(actual - est) / est, t = CONFIG.TIME_TOLERANCE;
+    if (dev <= t) return 100;
+    return Math.round(Math.max(0, 100 - ((dev - t) / (1 - t)) * 100));
+  }
+  function typeLabel(t) { return t === 'pg' ? 'Pilihan ganda' : 'Isian singkat'; }
+  // Nama batch untuk tampilan: batch 0 = "Batch Trial".
+  function batchName(n) { return Number(n) === 0 ? 'Batch Trial' : 'Batch ' + n; }
+  // Apakah jawaban yang sedang diisi sudah siap dikirim (radio terpilih, atau teks tidak kosong).
+  function answerReady(q) { return q.type === 'pg' ? !!S.choice : !!(S.choice && S.choice.trim()); }
+  // Teks soal: blok ``` ... ``` ditampilkan sebagai kode
+  function rich(text) {
+    return String(text || '').split('```').map(function (part, i) {
+      if (i % 2) return '<pre class="lc-code">' + esc(part.replace(/^(pascal|pas|text)?\r?\n/i, '').replace(/\s+$/, '')) + '</pre>';
+      var t = part.trim();
+      return t ? '<p>' + esc(t) + '</p>' : '';
+    }).join('');
+  }
+  function saveSession() {
+    try { sessionStorage.setItem('lc_token', S.token); sessionStorage.setItem('lc_id', S.id); } catch (e) {}
+  }
+  function clearSession() {
+    try { sessionStorage.removeItem('lc_token'); sessionStorage.removeItem('lc_id'); } catch (e) {}
+    S.token = ''; S.id = '';
+    stopPing(); stopMemTimer();
+  }
+
+  /* ====== Tema terang / gelap ======
+     Bawaan: terang (termasuk di halaman login). Pilihan disimpan di perangkat ini (localStorage),
+     tidak ikut terhapus saat keluar, jadi masuk lagi tetap memakai tema yang sama. */
+  function readTheme() {
+    try { return localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light'; } catch (e) { return 'light'; }
+  }
+  function applyTheme(t) {
+    S.theme = t === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', S.theme);
+    var b = document.getElementById('lc-theme');
+    if (b) b.setAttribute('aria-checked', S.theme === 'dark' ? 'true' : 'false');
+  }
+  function setTheme(t) {
+    applyTheme(t);
+    try { localStorage.setItem(THEME_KEY, S.theme); } catch (e) {}
+  }
+  function initTheme() {
+    applyTheme(readTheme());
+    var b = document.getElementById('lc-theme');
+    if (b) b.onclick = function () { setTheme(S.theme === 'dark' ? 'light' : 'dark'); };
+  }
+
+  // Heartbeat: memberi tahu server bahwa kamu masih membuka aplikasi (dipakai status online di menu Anggota)
+  var pingTimer = null;
+  function startPing() {
+    if (pingTimer || !S.token) return;
+    pingTimer = setInterval(function () {
+      if (!S.token) return stopPing();
+      api('ping').catch(function () {});
+    }, 60000);
+  }
+  function stopPing() { if (pingTimer) { clearInterval(pingTimer); pingTimer = null; } }
+
+  function isHandled(e) { return !!e && (e.message === 'SESSION' || e.message === 'CLOSED'); }
+
+  /* ====== Layar terakhir (diingat per akun, dibuka lagi otomatis setelah login) ======
+     Hanya layar tingkat menu (bukan soal/ready/question/review) yang disimpan,
+     supaya progres pengerjaan tetap lewat mekanisme "lanjutkan nanti" yang sudah ada. */
+  function lastScreenKey() { return 'lc_lastscreen_' + S.id; }
+  function rememberScreen(name) {
+    if (!RESUMABLE_SCREENS[name]) return;
+    try { localStorage.setItem(lastScreenKey(), name); } catch (e) {}
+  }
+  function readLastScreen() {
+    try { return localStorage.getItem(lastScreenKey()) || ''; } catch (e) { return ''; }
+  }
+  function forgetLastScreen() {
+    try { localStorage.removeItem(lastScreenKey()); } catch (e) {}
+  }
+  // Buka kembali layar tingkat menu yang terakhir dikunjungi, sesuai peran akun saat ini.
+  function resumeLastScreen() {
+    var last = readLastScreen();
+    if (last === 'mine') return openMine();
+    if (last === 'members' && (S.role === 'admin' || S.membersOpen)) return openMembers();
+    if (S.role === 'admin') {
+      if (last === 'adminlist') return openAdminList();
+      if (last === 'settings') return openSettings();
+    }
+    S.screen = 'menu'; S.err = ''; render();
+  }
+
+  /* ====== Progres tersimpan (jeda / lanjutkan nanti) ======
+     Disimpan di sessionStorage browser ini, per ID. Stopwatch berhenti saat keluar
+     dan dilanjutkan dari waktu terakhir. Data hilang jika tab/browser ditutup. */
+  function progKey() { return 'lc_prog_' + S.id; }
+  function loadProg() {
+    try { S.prog = JSON.parse(sessionStorage.getItem(progKey()) || '{}') || {}; } catch (e) { S.prog = {}; }
+  }
+  function saveProg() {
+    try { sessionStorage.setItem(progKey(), JSON.stringify(S.prog)); } catch (e) {}
+  }
+  function prog(qid) { return S.prog[qid] || (S.prog[qid] = {}); }
+  function dropProg(qid) { delete S.prog[qid]; saveProg(); }
+
+  function apiLogin(id, kode) {
+    return fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'login', id: id, kode: kode }) })
+      .then(function (r) { return r.json(); });
+  }
+  function api(action, data) {
+    var body = Object.assign({ action: action, token: S.token }, data || {});
+    return fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify(body) })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res.ok && res.code === 'SESSION') {
+          clearSession();
+          S.screen = 'login'; S.err = res.error || 'Sesi berakhir. Silakan masuk lagi.';
+          render();
+          throw new Error('SESSION');
+        }
+        if (!res.ok && res.code === 'REVIEW_CLOSED') {
+          // Admin menutup review saat anggota sedang mengerjakan: progres lokal tetap aman.
+          stopTimer();
+          S.flash = res.error || 'Menu review sedang ditutup.';
+          loadStatus();
+          throw new Error('CLOSED');
+        }
+        return res;
+      });
+  }
+  function stopTimer() { if (S.timer) { clearInterval(S.timer); S.timer = null; } stopMemTimer(); }
+  function goMenu() { rememberScreen('menu'); loadStatus(); }
+  function exitBack() { stopTimer(); if (S.mode === 'admin') openAdminList(); else goMenu(); }
+
+  /* ====== Dialog konfirmasi ====== */
+  // o.danger = true membuat tombol konfirmasi berwarna merah (untuk tindakan yang tidak bisa dibatalkan).
+  function confirmBox(o) {
+    var root = document.querySelector('.lc-root');
+    var ov = document.createElement('div');
+    ov.className = 'lc-modal';
+    ov.innerHTML =
+      '<div class="lc-modal-box" role="dialog" aria-modal="true" aria-labelledby="lc-mt">' +
+      '<h3 id="lc-mt">' + esc(o.title) + '</h3>' +
+      '<p>' + esc(o.text) + '</p>' +
+      (o.detail ? '<p class="lc-mute">' + esc(o.detail) + '</p>' : '') +
+      '<div class="lc-row"><button class="lc-btn' + (o.danger ? ' danger' : '') + '" data-ok>' + esc(o.ok) + '</button>' +
+      '<button class="lc-btn ghost" data-cancel>' + esc(o.cancel) + '</button></div></div>';
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    function close() {
+      document.removeEventListener('keydown', onKey);
+      if (ov.parentNode) ov.parentNode.removeChild(ov);
+    }
+    ov.querySelector('[data-ok]').onclick = function () { close(); o.onOk(); };
+    ov.querySelector('[data-cancel]').onclick = close;
+    ov.onclick = function (e) { if (e.target === ov) close(); };
+    document.addEventListener('keydown', onKey);
+    root.appendChild(ov);
+    // Tindakan berbahaya: fokus awal di tombol Batal supaya tidak terhapus karena Enter tak sengaja.
+    ov.querySelector(o.danger ? '[data-cancel]' : '[data-ok]').focus();
+  }
+
+  /* ====== Kata-kata loading yang gantian muncul (biar tidak garing nunggu) ====== */
+  var FUN_WORDS = [
+    'Mengasah pensil imajiner…', 'Menyeduh kopi logika…', 'Menelusuri baris kode Pascal…',
+    'Mengintip lembar jawaban…', 'Menghubungi profesor logika…', 'Menghitung mundur estimasi waktu…',
+    'Mengocok pilihan A sampai E…', 'Menyalakan lampu ruang review…', 'Mengejar variabel yang kabur…',
+    'Menyusun rubrik 3C-IT…', 'Membuka gulungan soal…', 'Menyapa reviewer lain…',
+    'Menajamkan mata algoritma…', 'Merapikan array soal…', 'Menunggu compiler berpikir…',
+    'Mengecek tanda kurung yang hilang…', 'Menata ulang meja kerja reviewer…', 'Mengintip database sebentar…'
+  ];
+  var funTimer = null;
+  function startFunLoader(el) {
+    if (funTimer) { clearInterval(funTimer); funTimer = null; }
+    if (!el) return;
+    var pool = FUN_WORDS.slice();
+    for (var i = pool.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+    var idx = 0;
+    el.textContent = pool[0];
+    funTimer = setInterval(function () {
+      idx = (idx + 1) % pool.length;
+      el.textContent = pool[idx];
+    }, 1400);
+  }
+  function stopFunLoader() { if (funTimer) { clearInterval(funTimer); funTimer = null; } }
+
+  /* ====== GAMBAR SOAL (tampilan saat mengerjakan / meninjau) ====== */
+  // figInner dipakai baik saat render pertama (sinkron, bisa langsung tampil kalau
+  // gambar sudah ada di cache S.img dari proses preload) maupun saat update async.
+  function figInner(f) {
+    if (S.img[f] && S.img[f] !== 'err') {
+      return '<img alt="Gambar pada soal" src="' + S.img[f] + '" class="lc-img" data-zoom>' +
+        '<div class="lc-mute">Ketuk gambar untuk memperbesar</div>';
+    }
+    if (S.img[f] === 'err') {
+      return '<div class="lc-imgerr">Gambar gagal dimuat. <button type="button" class="lc-btn ghost" data-retry>Coba lagi</button></div>';
+    }
+    return '<div class="lc-imgload">Memuat gambar…</div>';
+  }
+  function imgHtml(q) {
+    if (!q.images || !q.images.length) return '';
+    return '<div class="lc-imgs">' + q.images.map(function (f) {
+      return '<figure class="lc-fig" data-fid="' + esc(f) + '">' + figInner(f) + '</figure>';
+    }).join('') + '</div>';
+  }
+  function fetchImg(f) {
+    if (S.img[f] && S.img[f] !== 'err') return Promise.resolve();
+    if (S.imgP[f]) return S.imgP[f];
+    S.imgP[f] = api('image', { fid: f }).then(function (r) {
+      if (!r.ok) throw new Error(r.error || 'gagal');
+      S.img[f] = 'data:' + r.mime + ';base64,' + r.data;
+    }).catch(function () { S.img[f] = 'err'; })
+      .then(function () { delete S.imgP[f]; });
+    return S.imgP[f];
+  }
+  function fillFig(f) {
+    var fig = app.querySelector('.lc-fig[data-fid="' + f + '"]');
+    if (!fig) return;
+    fig.innerHTML = figInner(f);
+    var im = fig.querySelector('img[data-zoom]');
+    if (im) im.onclick = function () { zoomImg(S.img[f]); };
+    var retry = fig.querySelector('[data-retry]');
+    if (retry) retry.onclick = function () { delete S.img[f]; fig.innerHTML = figInner(f); fetchImg(f).then(function () { fillFig(f); }); };
+  }
+  function loadImgs(q) {
+    return Promise.all((q.images || []).map(function (f) {
+      return fetchImg(f).then(function () { fillFig(f); });
+    }));
+  }
+  // Preload semua gambar dari sekumpulan soal (satu batch, atau satu soal admin)
+  // SEBELUM soal pertama ditampilkan, supaya tidak ada jeda tunggu saat pindah soal.
+  function preloadAllImages(qs) {
+    var ids = [];
+    (qs || []).forEach(function (q) {
+      (q.images || []).forEach(function (f) { if (ids.indexOf(f) < 0) ids.push(f); });
+    });
+    if (!ids.length) return Promise.resolve();
+    return Promise.all(ids.map(fetchImg));
+  }
+  function zoomImg(src) {
+    var ov = document.createElement('div');
+    ov.className = 'lc-zoom';
+    ov.innerHTML = '<button class="lc-btn" aria-label="Tutup">Tutup</button>';
+    var im = new Image(); im.src = src; im.alt = 'Gambar diperbesar';
+    ov.appendChild(im);
+    ov.onclick = function (e) { if (e.target !== im) document.body.removeChild(ov); };
+    document.body.appendChild(ov);
+  }
+
+  /* ====== Kompresi gambar untuk upload (di browser, sebelum dikirim) ====== */
+  function compressImage(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error('Gagal membaca file.')); };
+      reader.onload = function (e) {
+        var img = new Image();
+        img.onerror = function () { reject(new Error('File bukan gambar yang valid.')); };
+        img.onload = function () {
+          var scale = Math.min(1, CONFIG.IMAGE_MAX_WIDTH / img.width);
+          var w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale));
+          var canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          var ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); // latar putih untuk PNG transparan
+          ctx.drawImage(img, 0, 0, w, h);
+          var quality = 0.85;
+          (function tryEncode() {
+            var dataUrl = canvas.toDataURL('image/jpeg', quality);
+            var base64 = dataUrl.split(',')[1];
+            var bytes = Math.ceil(base64.length * 0.75);
+            if (bytes <= CONFIG.MAX_IMAGE_BYTES || quality <= 0.35) {
+              if (bytes > CONFIG.MAX_IMAGE_BYTES) { reject(new Error('Gambar masih terlalu besar setelah dikecilkan.')); return; }
+              resolve({ mime: 'image/jpeg', data: base64, preview: dataUrl });
+            } else {
+              quality = Math.round((quality - 0.1) * 100) / 100;
+              tryEncode();
+            }
+          })();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /* ====== VIEW: LOGIN ====== */
+  function viewLogin() {
+    app.innerHTML =
+      '<div class="lc-rule"></div><h1>Review soal</h1>' +
+      '<p class="lc-mute" style="margin:14px 0 28px">Divisi Logic &amp; Code CS. Masuk dengan ID reviewer dan kode akses pribadimu.</p>' +
+      '<label class="lc-label" for="lc-id">ID reviewer</label>' +
+      '<input class="lc-input" id="lc-id" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(S.id) + '">' +
+      '<label class="lc-label" for="lc-kode" style="margin-top:16px">Kode akses</label>' +
+      '<div class="lc-row"><input class="lc-input" id="lc-kode" type="password" style="flex:1;min-width:200px" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go">' +
+      '<button class="lc-btn" id="lc-go">Masuk</button></div>' +
+      (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
+    var inp = app.querySelector('#lc-id'), kd = app.querySelector('#lc-kode'), go = app.querySelector('#lc-go');
+    var doLogin = function () {
+      var id = inp.value.trim(), kode = kd.value.trim();
+      if (!id || !kode) { S.err = 'Isi ID reviewer dan kode akses.'; return viewLogin(); }
+      S.err = ''; go.disabled = true; go.textContent = 'Memeriksa…';
+      apiLogin(id, kode).then(function (res) {
+        if (!res.ok) throw new Error(res.error || 'Gagal masuk.');
+        S.id = res.id; S.token = res.token; S.nama = res.nama; S.role = res.role;
+        saveSession();
+        loadProg();
+        loadStatus();
+      }).catch(function (e) {
+        S.err = e.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server. Periksa API_URL dan koneksimu.' : e.message;
+        viewLogin();
+      });
+    };
+    go.onclick = doLogin;
+    inp.onkeydown = kd.onkeydown = function (e) { if (e.key === 'Enter') doLogin(); };
+    (S.id ? kd : inp).focus();
+  }
+
+  function viewLoading(msg) {
+    stopMemTimer();
+    app.innerHTML = '<div class="lc-center" role="status"><div class="lc-spin"></div><p>' + esc(msg) + '</p><p class="lc-mute" id="lc-fun"></p></div>';
+    startFunLoader(app.querySelector('#lc-fun'));
+  }
+
+  // resumeAfterLogin = true: setelah status berhasil dimuat, buka kembali layar
+  // menu terakhir yang dikunjungi akun ini (dipakai saat baru login / buka tab).
+  function loadStatus(resumeAfterLogin) {
+    if (!S.token) { S.screen = 'login'; return render(); }
+    viewLoading('Menyiapkan akunmu…');
+    api('config').catch(function () { return null; }).then(function (cfg) {
+      if (cfg && cfg.ok) {
+        // Sinkronkan batas yang bisa diatur admin lewat tab Pengaturan di Sheets,
+        // supaya hint di form (estimasi waktu, jumlah gambar, rentang rubrik) selalu sesuai.
+        CONFIG.MIN_EST = cfg.minEst; CONFIG.MAX_EST = cfg.maxEst;
+        CONFIG.MAX_IMAGES = cfg.maxImages; CONFIG.TIME_TOLERANCE = cfg.timeTolerance;
+        if (cfg.rubricMin != null) CONFIG.RUBRIC_MIN = cfg.rubricMin;
+        if (cfg.rubricMax != null) CONFIG.RUBRIC_MAX = cfg.rubricMax;
+      }
+      return api('status');
+    }).then(function (res) {
+      if (!res.ok) throw new Error(res.error || 'Gagal memuat status.');
+      S.id = res.id; S.nama = res.nama || ''; S.role = res.role;
+      S.made = res.made; S.madeThisBatch = res.madeThisBatch || 0;
+      S.maxQuestionsPerBatch = res.maxQuestionsPerBatch; S.currentBatch = res.currentBatch;
+      S.memberReviewOpen = res.memberReviewOpen; S.memberReviewReason = res.memberReviewReason || '';
+      S.memberCreateOpen = res.memberCreateOpen; S.allowedTypes = res.allowedTypes || 'KEDUANYA';
+      S.membersOpen = res.role === 'admin' || res.membersOpen !== false;
+      startPing();
+      if (res.role !== 'admin') {
+        S.batch = res.batch; S.hasBatch = res.hasBatch; S.batchTotal = res.batchTotal; S.batchDone = res.batchDone;
+        S.hasNewBatchAvailable = !!res.hasNewBatchAvailable;
+      }
+      S.err = '';
+      if (resumeAfterLogin) return resumeLastScreen();
+      S.screen = 'menu'; render();
+    }).catch(function (e) {
+      if (isHandled(e)) return;
+      S.err = e.message; S.screen = 'login'; render();
+    });
+  }
+
+  /* ====== VIEW: MENU ====== */
+  function navBar() {
+    return '<div class="lc-nav"><div><strong>' + esc(S.nama || S.id) + '</strong> ' +
+      '<span class="lc-badge">' + (S.role === 'admin' ? 'Admin' : 'Anggota') + '</span></div>' +
+      '<button class="lc-btn ghost small" id="lc-logout">Keluar</button></div>';
+  }
+  function bindNav() {
+    var lo = app.querySelector('#lc-logout');
+    if (lo) lo.onclick = function () {
+      api('logout').catch(function () {});
+      forgetLastScreen();
+      clearSession(); S.screen = 'login'; S.err = ''; render();
+    };
+    var mb = app.querySelector('#lc-menu-back');
+    if (mb) mb.onclick = goMenu;
+  }
+
+  function greetingWord() {
+    var h = new Date().getHours();
+    if (h >= 4 && h < 12) return 'Morning';
+    if (h >= 12 && h < 18) return 'Afternoon';
+    return 'Evening';
+  }
+  function statusBadge(kind) {
+    var map = { available: 'Available', completed: 'Completed', na: 'Not Available' };
+    return '<span class="lc-status-badge ' + kind + '">' + map[kind] + '</span>';
+  }
+  function reviewStatusKind() {
+    if (!S.memberReviewOpen) return 'na';
+    if (!S.hasBatch) return S.hasNewBatchAvailable ? 'available' : 'na';
+    if (S.batchDone < S.batchTotal) return 'available';
+    if (S.hasNewBatchAvailable) return 'available';
+    return 'completed';
+  }
+  function createStatusKind(createOpen) {
+    if (!createOpen) return 'na';
+    if (S.role === 'admin') return 'available';
+    if (S.maxQuestionsPerBatch && S.madeThisBatch >= S.maxQuestionsPerBatch) return 'completed';
+    return 'available';
+  }
+
+  function viewMenu() {
+    var flash = S.flash; S.flash = '';
+    var isAdmin = S.role === 'admin';
+    var createOpen = isAdmin || S.memberCreateOpen;
+
+    // Nomor batch sudah tampil besar di bawah judul "Menu", jadi di kartu cukup penjelasan singkatnya.
+    var batchInfo = '<p class="lc-mute" style="margin-bottom:14px">Soal baru yang kamu buat, dan soal yang bisa direview (campuran pilihan ganda &amp; isian singkat), mengikuti batch aktif.</p>';
+    var reviewerCard = '';
+    if (!isAdmin) {
+      var body;
+      if (!S.memberReviewOpen) {
+        body = '<div class="lc-notice"><p>' + esc(S.memberReviewReason || 'Menu review sedang ditutup.') + '</p></div>' +
+          '<p class="lc-mute">Menu ini akan terbuka lagi otomatis. Muat ulang halaman untuk memeriksa status terbaru.</p>';
+      } else if (!S.hasBatch) {
+        if (S.hasNewBatchAvailable) {
+          body = '<p>Kamu belum mengambil soal untuk direview.</p><button class="lc-btn" id="lc-start">Mulai review</button>';
+        } else {
+          body = '<p class="lc-mute">Belum ada soal baru yang bisa kamu review saat ini. Coba lagi nanti.</p>';
+        }
+      } else if (S.batchDone < S.batchTotal) {
+        body = '<p>Sesi ke-' + S.batch + ' — ' + S.batchDone + '/' + S.batchTotal + ' soal selesai.</p>' +
+          '<button class="lc-btn" id="lc-start">Lanjutkan review</button>';
+      } else if (S.hasNewBatchAvailable) {
+        body = '<p>Sesi ke-' + S.batch + ' sudah selesai semua.</p>' +
+          '<button class="lc-btn" id="lc-newbatch">Ambil soal baru</button>';
+      } else {
+        body = '<p>Kamu sudah selesai mereview semua soal yang tersedia.</p>' +
+          '<button class="lc-btn" disabled>Ambil soal baru</button>' +
+          '<p class="lc-mute lc-hintline">Belum ada soal baru yang bisa diambil saat ini.</p>';
+      }
+      reviewerCard = '<div class="lc-card"><div class="lc-card-h"><h3>Review soal</h3>' + statusBadge(reviewStatusKind()) + '</div>' + batchInfo + body + '</div>';
+    } else {
+      reviewerCard =
+        '<div class="lc-card"><h3>Review soal (mode admin)</h3>' + batchInfo +
+        '<div class="lc-notice"><p>Status untuk anggota — Review: <strong>' + (S.memberReviewOpen ? 'dibuka' : 'ditutup') + '</strong>' +
+        (S.memberReviewOpen ? '' : ' (' + esc(S.memberReviewReason) + ')') +
+        '. Pembuatan soal: <strong>' + (S.memberCreateOpen ? 'dibuka' : 'ditutup') + '</strong>. ' +
+        'Tipe soal yang boleh dibuat anggota: <strong>' + esc(TYPE_LABELS[S.allowedTypes] || S.allowedTypes) + '</strong>. ' +
+        'Atur di menu Pengaturan platform di bawah; akun admin tidak terkena penguncian.</p></div>' +
+        '<p class="lc-mute">Kamu bisa membuka dan mengerjakan soal apa pun (tipe apa pun) tanpa batas, kapan pun. Dari daftar soal, kamu juga bisa mengedit atau menghapus soal siapa pun.</p>' +
+        '<label class="lc-toggle" style="margin-bottom:14px"><input type="checkbox" id="lc-participate"' + (S.adminParticipate ? ' checked' : '') + '> Ikut menilai (tersimpan ke Review) saat meninjau soal</label>' +
+        '<div><button class="lc-btn" id="lc-adminlist">Buka daftar soal</button></div></div>';
+    }
+
+    var maxQTxt = (isAdmin || !S.maxQuestionsPerBatch) ? 'tanpa batas per batch' : (S.madeThisBatch + ' dari ' + S.maxQuestionsPerBatch + ' untuk batch ini');
+    var typeTxt = TYPE_LABELS[S.allowedTypes] || S.allowedTypes;
+    var soalCard;
+    if (createOpen) {
+      soalCard =
+        '<div class="lc-card"><div class="lc-card-h"><h3>Soal saya</h3>' + statusBadge(createStatusKind(createOpen)) + '</div>' +
+        '<p>Kamu sudah membuat ' + S.made + ' soal total (' + maxQTxt + '). Soal barunya otomatis masuk ' + esc(batchName(S.currentBatch)) + '.</p>' +
+        (isAdmin ? '' : '<p class="lc-mute">Tipe soal yang bisa kamu buat: ' + esc(typeTxt) + '.</p>') +
+        '<button class="lc-btn" id="lc-mine">Kelola soal saya</button></div>';
+    } else {
+      soalCard =
+        '<div class="lc-card"><div class="lc-card-h"><h3>Soal saya</h3>' + statusBadge('na') + '</div>' +
+        '<div class="lc-notice"><p>Pembuatan soal baru sedang ditutup oleh admin.</p></div>' +
+        '<p>Kamu sudah membuat ' + S.made + ' soal. Kamu masih bisa melihat soalmu, tetapi belum bisa membuat soal baru.</p>' +
+        '<button class="lc-btn" id="lc-mine">Lihat soal saya</button></div>';
+    }
+
+    var membersCard;
+    if (isAdmin || S.membersOpen) {
+      membersCard =
+        '<div class="lc-card"><h3>Progres tim</h3>' +
+        '<p>Lihat daftar progres membuat soal dan review di tiap batch.</p>' +
+        '<button class="lc-btn" id="lc-members">Lihat progres tim</button></div>';
+    } else {
+      membersCard =
+        '<div class="lc-card"><h3>Progres tim</h3>' +
+        '<div class="lc-notice"><p>Progres tim sedang ditutup oleh admin.</p></div></div>';
+    }
+
+    var settingsCard = isAdmin
+      ? '<div class="lc-card"><h3>Pengaturan platform</h3>' +
+        '<p>Atur batch aktif, jumlah soal, batas estimasi waktu, rentang penilaian rubrik, tipe soal yang boleh dibuat anggota, dan lain-lain langsung dari sini. ' +
+        'Khusus admin.</p>' +
+        '<button class="lc-btn" id="lc-settings">Buka pengaturan</button></div>'
+      : '';
+
+    var trialNotice = Number(S.currentBatch) === 0
+      ? '<div class="lc-notice" style="margin-top:14px"><p>Ini batch uji coba. Silakan buat dan review soal untuk belajar memakai aplikasi sebelum batch sungguhan dimulai.</p></div>'
+      : '';
+
+    app.innerHTML =
+      navBar() +
+      '<div class="lc-rule"></div>' +
+      '<div class="lc-titlerow"><h2>' + esc(greetingWord()) + ', ' + esc(S.nama || S.id) + '</h2><h2>Menu</h2></div>' +
+      '<div class="lc-batchbig"><span>Batch yang sedang aktif</span><b>' + esc(batchName(S.currentBatch)) + '</b></div>' +
+      trialNotice +
+      '<div style="margin-top:18px">' + reviewerCard + soalCard + membersCard + settingsCard + '</div>' +
+      (flash ? '<p class="lc-err" role="alert">' + esc(flash) + '</p>' : '') +
+      (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
+
+    bindNav();
+    var st = app.querySelector('#lc-start'); if (st) st.onclick = function () { startBatch(false); };
+    var nb = app.querySelector('#lc-newbatch'); if (nb) nb.onclick = function () { startBatch(true); };
+    var mi = app.querySelector('#lc-mine'); if (mi) mi.onclick = openMine;
+    // Masuk dari menu = mulai bersih (pencarian & filter direset).
+    var al = app.querySelector('#lc-adminlist'); if (al) al.onclick = function () { openAdminList(true); };
+    var pt = app.querySelector('#lc-participate'); if (pt) pt.onchange = function () { S.adminParticipate = pt.checked; };
+    var sg = app.querySelector('#lc-settings'); if (sg) sg.onclick = openSettings;
+    var mm = app.querySelector('#lc-members'); if (mm) mm.onclick = openMembers;
+  }
+
+  /* ====== Masuk ke sebuah soal: konfirmasi mulai, atau lanjut ke penilaian kalau sudah dijawab ====== */
+  // skipReady = true dipakai saat pindah otomatis ke soal berikutnya setelah
+  // penilaian terkirim. Konfirmasi "Siap mengerjakan soal ini?" hanya muncul
+  // waktu masuk dari menu / daftar soal, bukan di tengah batch.
+  function enterQuestion(skipReady) {
+    var q = S.qs[0], p = S.prog[q.qid] || {};
+    S.err = ''; S.busy = false;
+    if (p.checked) {
+      S.choice = p.checked.choice;
+      S.key = p.checked.key; S.est = p.checked.est;
+      S.correct = p.checked.correct; S.actual = p.checked.actual;
+      S.ratings = p.ratings || {}; S.note = p.note || '';
+      S.screen = 'review';
+    } else {
+      S.choice = p.choice || (q.type === 'pg' ? null : '');
+      S.screen = skipReady ? 'question' : 'ready';
+    }
+    render();
+  }
+
+  /* ====== ALUR REVIEWER: batch soal ====== */
+  function startBatch(forceNew) {
+    S.err = '';
+    viewLoading(forceNew ? 'Mengambil batch baru…' : 'Menyiapkan soalmu…');
+    api(forceNew ? 'newbatch' : 'start').then(function (res) {
+      if (!res.ok) throw new Error(res.error || 'Gagal memuat.');
+      S.mode = 'reviewer';
+      S.qs = res.questions; S.batchTotal = res.batchTotal; S.batchDone = res.batchDone;
+      S.batch = res.batch; S.choice = null;
+      if (!S.qs.length) { S.hasNewBatchAvailable = false; S.screen = 'done'; return render(); }
+      viewLoading('Menyiapkan gambar soal…');
+      return preloadAllImages(S.qs).then(function () { enterQuestion(); });
+    }).catch(function (e) {
+      if (isHandled(e)) return;
+      S.err = e.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server.' : e.message;
+      S.screen = 'menu'; loadStatus();
+    });
+  }
+
+  /* ====== ALUR ADMIN: daftar soal ====== */
+  // fresh === true: mulai bersih (pencarian & filter direset). Tanpa argumen: pencarian & filter
+  // dipertahankan, jadi setelah meninjau / mengedit / menghapus, admin kembali ke tampilan yang sama.
+  function openAdminList(fresh) {
+    S.err = '';
+    if (fresh === true) { S.adminSearch = ''; S.adminBatchFilter = 'all'; S.adminTypeFilter = 'all'; }
+    rememberScreen('adminlist');
+    viewLoading('Memuat daftar soal…');
+    api('admin_list').then(function (res) {
+      if (!res.ok) throw new Error(res.error || 'Gagal memuat daftar soal.');
+      S.adminListData = res.questions;
+      S.screen = 'adminlist'; render();
+    }).catch(function (e) {
+      if (isHandled(e)) return;
+      S.err = e.message; S.screen = 'menu'; loadStatus();
+    });
+  }
+  // Batch yang benar-benar ada di daftar soal (untuk isi dropdown filter), urut naik.
+  function adminBatchOptions() {
+    var seen = {}, out = [];
+    (S.adminListData || []).forEach(function (x) {
+      var b = Number(x.batch);
+      if (!seen[b]) { seen[b] = true; out.push(b); }
+    });
+    return out.sort(function (a, c) { return a - c; });
+  }
+  // Daftar soal setelah pencarian + filter batch + filter jenis. Dipakai juga untuk "soal berikutnya".
+  function adminFiltered() {
+    var kw = (S.adminSearch || '').trim().toLowerCase();
+    return (S.adminListData || []).filter(function (x) {
+      if (S.adminBatchFilter !== 'all' && String(x.batch) !== S.adminBatchFilter) return false;
+      if (S.adminTypeFilter !== 'all' && x.type !== S.adminTypeFilter) return false;
+      if (!kw) return true;
+      return (x.qid || '').toLowerCase().indexOf(kw) >= 0 ||
+        (x.creator || '').toLowerCase().indexOf(kw) >= 0 ||
+        (x.preview || '').toLowerCase().indexOf(kw) >= 0;
+    });
+  }
+  function viewAdminList() {
+    // Render ulang terjadi tiap ketikan / ganti filter, jadi fokus dijaga supaya tidak loncat.
+    var ae = document.activeElement, aid = ae && ae.id ? ae.id : '';
+    var note = S.adminNote; S.adminNote = null;
+
+    var all = S.adminListData || [];
+    var batches = adminBatchOptions();
+    if (S.adminBatchFilter !== 'all' && batches.indexOf(Number(S.adminBatchFilter)) < 0) S.adminBatchFilter = 'all';
+    var filtered = adminFiltered();
+    var filterActive = S.adminBatchFilter !== 'all' || S.adminTypeFilter !== 'all' || !!(S.adminSearch || '').trim();
+
+    var rows = filtered.map(function (q) {
+      var hasProg = !!S.prog[q.qid];
+      return '<div class="lc-list-item"><div class="lc-meta">' +
+        '<p><strong>' + esc(q.qid) + '</strong> <span class="lc-badge">' + esc(typeLabel(q.type)) + '</span> — dibuat oleh ' + esc(q.creator) + ' • ' + esc(batchName(q.batch)) + '</p>' +
+        '<p class="lc-mute">' + esc(q.preview) + (q.preview.length >= 90 ? '…' : '') + '</p>' +
+        '<p class="lc-mute">' + q.reviews + ' review dari anggota lain' + (q.mineDone ? ' • sudah kamu nilai' : '') +
+        (hasProg ? ' • <span class="lc-badge">Ada progres tersimpan</span>' : '') + '</p>' +
+        '</div><div class="lc-list-actions">' +
+        '<button class="lc-btn small" data-review="' + esc(q.qid) + '">' + (hasProg ? 'Lanjutkan' : 'Tinjau') + '</button>' +
+        '<button class="lc-btn ghost small" data-edit="' + esc(q.qid) + '">Edit</button>' +
+        '<button class="lc-btn ghost small danger" data-del="' + esc(q.qid) + '">Hapus</button>' +
+        '</div></div>';
+    }).join('') || (all.length
+      ? '<p class="lc-mute">Tidak ada soal yang cocok dengan pencarian atau filter yang dipilih.</p>'
+      : '<p class="lc-mute">Belum ada soal.</p>');
+
+    var batchSel = '<option value="all"' + (S.adminBatchFilter === 'all' ? ' selected' : '') + '>Semua batch</option>' +
+      batches.map(function (b) {
+        return '<option value="' + b + '"' + (String(b) === S.adminBatchFilter ? ' selected' : '') + '>' + esc(batchName(b)) +
+          (b === Number(S.currentBatch) ? ' (aktif)' : '') + '</option>';
+      }).join('');
+    var typeSel = [['all', 'Semua jenis'], ['pg', 'Pilihan ganda (PG)'], ['isian', 'Isian singkat (IS)']].map(function (o) {
+      return '<option value="' + o[0] + '"' + (S.adminTypeFilter === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
+    }).join('');
+
+    app.innerHTML = navBar() +
+      '<div class="lc-rule"></div><h2>Daftar soal (admin)</h2>' +
+      '<label class="lc-toggle" style="margin:14px 0"><input type="checkbox" id="lc-participate"' + (S.adminParticipate ? ' checked' : '') + '> Ikut menilai saat meninjau</label>' +
+      (note ? (note.kind === 'err'
+        ? '<p class="lc-err" role="alert">' + esc(note.text) + '</p>'
+        : '<div class="lc-notice" role="status"><p>' + esc(note.text) + '</p></div>') : '') +
+      '<div class="lc-search"><label class="lc-label" for="lc-adm-search">Cari soal</label>' +
+      '<input class="lc-input" id="lc-adm-search" type="search" placeholder="Cari berdasarkan ID soal, pembuat, atau isi soal…" value="' + esc(S.adminSearch) + '" autocomplete="off">' +
+      '<div class="lc-filterrow">' +
+      '<div><label class="lc-label" for="lc-adm-batch">Batch</label><select class="lc-select" id="lc-adm-batch">' + batchSel + '</select></div>' +
+      '<div><label class="lc-label" for="lc-adm-type">Jenis soal</label><select class="lc-select" id="lc-adm-type">' + typeSel + '</select></div>' +
+      '</div>' +
+      '<div class="lc-row" style="margin-top:8px"><span class="lc-mute" role="status">' + filtered.length + ' dari ' + all.length + ' soal ditampilkan.</span>' +
+      (filterActive ? '<button type="button" class="lc-btn ghost small" id="lc-adm-reset">Reset pencarian dan filter</button>' : '') +
+      '</div></div>' +
+      '<div>' + rows + '</div>' +
+      '<div class="lc-row" style="margin-top:10px"><button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
+      (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
+    bindNav();
+    app.querySelector('#lc-participate').onchange = function (e) { S.adminParticipate = e.target.checked; };
+    app.querySelector('#lc-adm-search').oninput = function (e) { S.adminSearch = e.target.value; viewAdminList(); };
+    app.querySelector('#lc-adm-batch').onchange = function (e) { S.adminBatchFilter = e.target.value; viewAdminList(); };
+    app.querySelector('#lc-adm-type').onchange = function (e) { S.adminTypeFilter = e.target.value; viewAdminList(); };
+    var rs = app.querySelector('#lc-adm-reset');
+    if (rs) rs.onclick = function () { S.adminSearch = ''; S.adminBatchFilter = 'all'; S.adminTypeFilter = 'all'; viewAdminList(); };
+    app.querySelectorAll('[data-review]').forEach(function (b) {
+      b.onclick = function () { openAdminQuestion(b.getAttribute('data-review')); };
+    });
+    app.querySelectorAll('[data-edit]').forEach(function (b) {
+      b.onclick = function () { openAdminEdit(b.getAttribute('data-edit')); };
+    });
+    app.querySelectorAll('[data-del]').forEach(function (b) {
+      b.onclick = function () { deleteAdminQuestion(b.getAttribute('data-del')); };
+    });
+
+    if (aid) {
+      var f = app.querySelector('#' + aid);
+      if (f && f.focus) {
+        f.focus();
+        if (aid === 'lc-adm-search') { var n = f.value.length; try { f.setSelectionRange(n, n); } catch (e) {} }
+      }
+    }
+  }
+  function openAdminQuestion(qid, skipReady) {
+    S.err = '';
+    viewLoading('Membuka soal…');
+    api('admin_open', { qid: qid }).then(function (res) {
+      if (!res.ok) throw new Error(res.error || 'Gagal membuka soal.');
+      S.mode = 'admin';
+      S.reviewMode = S.adminParticipate ? 'rate' : 'peek';
+      S.qs = [res.question]; S.choice = null;
+      viewLoading('Menyiapkan gambar soal…');
+      return preloadAllImages(S.qs).then(function () { enterQuestion(skipReady); });
+    }).catch(function (e) {
+      if (isHandled(e)) return;
+      S.adminNote = { kind: 'err', text: e.message };
+      S.screen = 'adminlist'; openAdminList();
+    });
+  }
+  // Admin: muat detail lengkap soal siapa pun ke form edit yang sama dengan "Soal saya".
+  function openAdminEdit(qid) {
+    S.err = '';
+    viewLoading('Membuka soal…');
+    api('admin_question_full', { qid: qid }).then(function (res) {
+      if (!res.ok) throw new Error(res.error || 'Gagal membuka soal.');
+      fillForm(res);
+      S.formOrigin = 'adminlist'; S.formCreator = res.creator || ''; S.formBatch = res.batch;
+      S.formErr = ''; S.formImagesNew = [];
+      S.screen = 'create'; render();
+    }).catch(function (e) {
+      if (isHandled(e)) return;
+      S.adminNote = { kind: 'err', text: e.message };
+      openAdminList();
+    });
+  }
+  // Admin: hapus soal (setelah konfirmasi). Isi barisnya dikosongkan di Sheet oleh backend.
+  function deleteAdminQuestion(qid) {
+    var q = (S.adminListData || []).filter(function (x) { return x.qid === qid; })[0];
+    var info = q ? typeLabel(q.type) + ', dibuat oleh ' + q.creator + ', ' + batchName(q.batch) : '';
+    confirmBox({
+      title: 'Hapus soal ' + qid + '?',
+      text: (info ? '(' + info + ') ' : '') + 'Isi soal dikosongkan dari Sheet dan gambarnya dipindahkan ke sampah Drive.',
+      detail: (q && q.reviews ? q.reviews + ' review dari anggota lain sudah masuk untuk soal ini. ' : '') +
+        'Baris di tab Review dan Penugasan tidak ikut dihapus, tetapi soal ini tidak muncul lagi untuk siapa pun. ' +
+        'Tindakan ini tidak bisa dibatalkan dari sini.',
+      ok: 'Ya, hapus soal',
+      cancel: 'Batal',
+      danger: true,
+      onOk: function () {
+        viewLoading('Menghapus soal…');
+        api('admin_delete', { qid: qid }).then(function (res) {
+          if (!res.ok) throw new Error(res.error || 'Gagal menghapus soal.');
+          dropProg(qid);
+          S.adminNote = { kind: 'ok', text: 'Soal ' + qid + ' sudah dihapus.' };
+          openAdminList();
+        }).catch(function (e) {
+          if (isHandled(e)) return;
+          S.adminNote = { kind: 'err', text: 'Soal ' + qid + ' belum terhapus: ' + e.message };
+          openAdminList();
+        });
+      }
+    });
+  }
+  // Soal berikutnya setelah qid, mengikuti urutan daftar yang sedang tampil (pencarian + filter)
+  function nextAdminQid(qid) {
+    var list = adminFiltered();
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].qid === qid) return i + 1 < list.length ? list[i + 1].qid : null;
+    }
+    return null;
+  }
+
+  /* ====== VIEW: KONFIRMASI SEBELUM MULAI ====== */
+  function viewReady() {
+    var q = S.qs[0], p = S.prog[q.qid] || {}, el = Math.round(p.elapsed || 0);
+    var isAdmin = S.mode === 'admin';
+    var heading = isAdmin ? 'Mode admin — ' + esc(q.qid) : 'Soal ' + (S.batchDone + 1) + ' dari ' + S.batchTotal;
+    var resume = el > 0;
+
+    app.innerHTML =
+      '<div class="lc-rule"></div><h2>' + heading + '</h2>' +
+      '<div class="lc-card" style="margin-top:18px"><h3>' + (resume ? 'Lanjutkan soal ini?' : 'Siap mengerjakan soal ini?') + '</h3>' +
+      '<p>Soal belum ditampilkan. Stopwatch mulai berjalan setelah kamu menekan tombol di bawah, dan berhenti saat kamu menekan Selesai mengerjakan.</p>' +
+      (resume ? '<p>Kamu sudah mengerjakan soal ini selama <strong>' + fmt(el) + '</strong>. Stopwatch dilanjutkan dari waktu itu.</p>' : '') +
+      (isAdmin ? '<p class="lc-mute">' + (S.reviewMode === 'rate' ? 'Penilaianmu akan tersimpan ke Review.' : 'Kamu hanya meninjau, tidak ikut menilai.') + '</p>' : '') +
+      '<div class="lc-row" style="margin-top:14px"><button class="lc-btn" id="lc-begin">' + (resume ? 'Lanjutkan mengerjakan' : 'Mulai mengerjakan') + '</button>' +
+      '<button class="lc-btn ghost" id="lc-back">' + (isAdmin ? 'Kembali ke daftar soal' : 'Kembali ke menu') + '</button></div></div>';
+
+    app.querySelector('#lc-begin').onclick = function () { S.screen = 'question'; render(); };
+    app.querySelector('#lc-back').onclick = exitBack;
+  }
+
+  /* ====== VIEW: MENGERJAKAN SOAL (reviewer & admin) ====== */
+  function pauseQuestion() {
+    var q = S.qs[0], p = prog(q.qid);
+    if (S.stopped) p.elapsed = S.actual;
+    else if (S.started) p.elapsed = Math.round(S.base + (Date.now() - S.t0) / 1000);
+    p.choice = S.choice;
+    saveProg();
+    exitBack();
+  }
+
+  function viewQuestion() {
+    var q = S.qs[0];
+    var answerHtml;
+    if (q.type === 'pg') {
+      answerHtml = '<div role="radiogroup" aria-label="Pilihan jawaban">' + q.options.map(function (o) {
+        return '<label class="lc-opt"><input type="radio" name="lc-choice" value="' + esc(o.key) + '"' +
+          (S.choice === o.key ? ' checked' : '') + '><span><b>' + esc(o.key) + '.</b><em style="font-style:normal">' + esc(o.text) + '</em></span></label>';
+      }).join('') + '</div>';
+    } else {
+      answerHtml = '<label class="lc-label" for="lc-textans">Jawabanmu</label>' +
+        '<input class="lc-input" id="lc-textans" maxlength="500" value="' + esc(S.choice || '') + '" ' +
+        'placeholder="Ketik jawaban singkat di sini" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">';
+    }
+
+    S.base = Math.round((S.prog[q.qid] && S.prog[q.qid].elapsed) || 0);
+
+    var heading, sub;
+    if (S.mode === 'admin') {
+      heading = 'Mode admin — ' + esc(q.qid);
+      sub = S.reviewMode === 'rate' ? 'Penilaianmu akan tersimpan ke Review.' : 'Kamu hanya meninjau, tidak ikut menilai.';
+    } else {
+      heading = 'Soal ' + (S.batchDone + 1) + ' dari ' + S.batchTotal;
+      sub = 'Stopwatch berjalan sampai kamu menekan Selesai mengerjakan.';
+    }
+    // Soal berikutnya dibuka tanpa layar konfirmasi, jadi kalau stopwatch tidak
+    // mulai dari nol, alasannya perlu terlihat di sini.
+    if (S.base > 0) sub = 'Dilanjutkan dari ' + fmt(S.base) + '. ' + sub;
+
+    app.innerHTML =
+      '<div class="lc-stick"><div class="lc-top"><div><h2>' + heading + '</h2>' +
+      '<div class="lc-mute">' + sub + '</div></div>' +
+      '<div class="lc-sw" id="lc-sw" role="timer" aria-label="Waktu pengerjaan">' + fmt(S.base) + '</div></div>' +
+      (S.mode === 'reviewer' ? '<div class="lc-bar"><i style="width:' + Math.round((S.batchDone / S.batchTotal) * 100) + '%"></i></div>' : '<div class="lc-bar"><i style="width:0%"></i></div>') + '</div>' +
+      '<div class="lc-q">' + imgHtml(q) + rich(q.soal) + '</div>' +
+      answerHtml +
+      '<div class="lc-row lc-pause"><button class="lc-btn ghost small" id="lc-exit">Keluar, lanjutkan nanti</button>' +
+      '<span class="lc-mute">Stopwatch berhenti dan dilanjutkan dari waktu sekarang saat kamu kembali. Progres disimpan di browser ini.</span></div>' +
+      '<div class="lc-actions"><button class="lc-btn" id="lc-done" disabled>Selesai mengerjakan</button><p class="lc-err" id="lc-qerr" role="alert" style="margin:8px 0 0"></p></div>';
+
+    var btn = app.querySelector('#lc-done');
+    S.started = false; S.stopped = false; btn.disabled = true;
+    app.querySelector('#lc-exit').onclick = pauseQuestion;
+    if (q.type === 'pg') {
+      app.querySelectorAll('input[name="lc-choice"]').forEach(function (r) {
+        r.onchange = function () { S.choice = r.value; btn.disabled = !S.started; };
+      });
+    } else {
+      var ta = app.querySelector('#lc-textans');
+      ta.oninput = function () { S.choice = ta.value; btn.disabled = !S.started || !answerReady(q); };
+    }
+    btn.onclick = function () {
+      if (!S.stopped) { S.actual = Math.round(S.base + (Date.now() - S.t0) / 1000); S.stopped = true; stopTimer(); }
+      var qerr = app.querySelector('#lc-qerr');
+      qerr.textContent = ''; btn.disabled = true; btn.textContent = 'Memeriksa jawaban…';
+      var payload = { qid: q.qid };
+      if (q.type === 'pg') payload.choice = S.choice; else payload.text = S.choice;
+      api('check', payload).then(function (res) {
+        if (!res.ok) throw new Error(res.error || 'Gagal memeriksa jawaban.');
+        S.choice = q.type === 'pg' ? res.choice : res.text;
+        S.key = res.answer; S.est = res.est; S.correct = res.correct;
+        S.ratings = {}; S.note = ''; S.err = '';
+        var p = prog(q.qid);
+        p.elapsed = S.actual; p.choice = S.choice;
+        p.checked = { choice: S.choice, key: res.answer, est: res.est, correct: res.correct, actual: S.actual };
+        p.ratings = {}; p.note = '';
+        saveProg();
+        S.screen = 'review';
+        render();
+      }).catch(function (e) {
+        if (isHandled(e)) return;
+        btn.disabled = false; btn.textContent = 'Selesai mengerjakan';
+        qerr.textContent = 'Jawaban belum terkirim: ' + e.message + ' Tekan tombol lagi untuk mengulang.';
+      });
+    };
+    // Stopwatch: mulai setelah semua gambar soal selesai dimuat, agar waktu unduh tidak ikut terhitung
+    stopTimer();
+    var sw = app.querySelector('#lc-sw');
+    var current = q;
+    loadImgs(q).then(function () {
+      if (S.screen !== 'question' || S.qs[0] !== current) return;
+      S.t0 = Date.now(); S.started = true; btn.disabled = !answerReady(q);
+      stopTimer();
+      S.timer = setInterval(function () { sw.textContent = fmt(S.base + (Date.now() - S.t0) / 1000); }, 250);
+      if (S.qs[1]) (S.qs[1].images || []).forEach(fetchImg); // siapkan gambar soal berikutnya
+    });
+  }
+
+  /* ====== VIEW: REVIEW (rubrik) atau PEEK (admin tanpa menilai) ====== */
+  function viewReview() {
+    var q = S.qs[0];
+    var ok = S.correct, tScore = timeScore(S.actual, S.est);
+    var keyBlock;
+    if (q.type === 'pg') {
+      var keyOpts = q.options.map(function (o) {
+        return '<div class="lc-opt-static' + (o.key === S.key ? ' key' : '') + '"><b>' + esc(o.key) + '.</b> ' + esc(o.text) +
+          (o.key === S.key ? ' (kunci)' : '') + '</div>';
+      }).join('');
+      keyBlock = '<details class="lc-details"><summary>Lihat soal dan kunci</summary><div class="lc-q" style="margin-top:8px">' + imgHtml(q) + rich(q.soal) + keyOpts + '</div></details>';
+    } else {
+      keyBlock = '<details class="lc-details"><summary>Lihat soal dan jawaban yang diterima</summary><div class="lc-q" style="margin-top:8px">' + imgHtml(q) + rich(q.soal) +
+        '<div class="lc-opt-static key">Jawaban diterima: ' + esc(S.key) + '</div></div></details>';
+    }
+
+    var answerLine = q.type === 'pg'
+      ? 'Jawabanmu <strong>' + esc(S.choice) + '</strong>, kunci <strong>' + esc(S.key) + '</strong>: '
+      : 'Jawabanmu <strong>' + esc(S.choice) + '</strong>: ';
+
+    var resultBlock =
+      '<div class="lc-result">' + answerLine +
+      '<strong class="' + (ok ? 'ok' : 'no') + '">' + (ok ? 'Benar' : 'Salah') + '</strong><br>' +
+      'Waktumu ' + fmt(S.actual) + ', estimasi pembuat ' + fmt(S.est) + '. Skor Time: <strong>' + tScore + '</strong>/100.</div>' +
+      keyBlock;
+
+    if (S.reviewMode === 'peek') {
+      var nxtPeek = nextAdminQid(q.qid);
+      app.innerHTML =
+        '<div class="lc-rule"></div><h2>Hasil — ' + esc(q.qid) + '</h2>' +
+        '<div style="margin-top:18px">' + resultBlock + '</div>' +
+        '<div class="lc-actions lc-row">' +
+        (nxtPeek ? '<button class="lc-btn" id="lc-next-q">Tinjau soal berikutnya (' + esc(nxtPeek) + ')</button>' : '') +
+        '<button class="lc-btn ghost" id="lc-next">Kembali ke daftar soal</button></div>';
+      loadImgs(q);
+      app.querySelector('#lc-next').onclick = function () { dropProg(q.qid); openAdminList(); };
+      var nq = app.querySelector('#lc-next-q');
+      if (nq) nq.onclick = function () { dropProg(q.qid); openAdminQuestion(nxtPeek, true); };
+      return;
+    }
+
+    var rmin = CONFIG.RUBRIC_MIN, rmax = CONFIG.RUBRIC_MAX, rmid = Math.round((rmin + rmax) / 2);
+    var maxTotal = rmax * 4 + 100;
+    var crit = RUBRIC.map(function (r) {
+      return '<div class="lc-crit"><div class="lc-crit-h"><strong>' + r.name + ' <span class="lc-mute" style="font-weight:400">' + r.sub + '</span></strong>' +
+        '<span class="lc-val empty" id="v-' + r.k + '">–</span></div>' +
+        '<div class="lc-mute" id="d-' + r.k + '">' + r.desc + '</div>' +
+        '<input class="lc-range" type="range" min="' + rmin + '" max="' + rmax + '" step="1" value="' + rmid + '" data-k="' + r.k + '" aria-label="Nilai ' + r.name + ' ' + rmin + ' sampai ' + rmax + '"></div>';
+    }).join('');
+
+    var nextLabel = S.mode === 'reviewer'
+      ? (S.qs.length > 1 ? 'Kirim penilaian dan lanjut' : 'Kirim penilaian dan selesai')
+      : 'Kirim penilaian';
+
+    app.innerHTML =
+      '<div class="lc-rule"></div><h2>' + (S.mode === 'admin' ? 'Nilai soal ' + esc(q.qid) : 'Nilai soal ' + (S.batchDone + 1) + ' dari ' + S.batchTotal) + '</h2>' +
+      '<div style="margin-top:18px">' + resultBlock + '</div>' +
+      crit +
+      '<div class="lc-crit"><label class="lc-label" for="lc-note">Catatan untuk pembuat soal (opsional)</label>' +
+      '<textarea class="lc-textarea" id="lc-note" maxlength="1000"></textarea></div>' +
+      '<div class="lc-total"><strong>Total</strong><span class="lc-val" id="lc-total">–</span></div>' +
+      '<div class="lc-row lc-pause"><button class="lc-btn ghost small" id="lc-exit">Keluar, lanjutkan nanti</button>' +
+      '<span class="lc-mute">Nilai dan catatan yang sudah kamu isi tetap tersimpan di browser ini.</span></div>' +
+      '<div class="lc-actions lc-row"><button class="lc-btn" id="lc-send" disabled>' + nextLabel + '</button>' +
+      '<span class="lc-mute" id="lc-hint">Geser keempat slider untuk mengaktifkan tombol.</span></div>' +
+      (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
+
+    loadImgs(q);
+    var send = app.querySelector('#lc-send');
+    function refresh() {
+      var sum = tScore, all = true;
+      RUBRIC.forEach(function (r) {
+        var v = S.ratings[r.k], el = app.querySelector('#v-' + r.k);
+        if (v == null) { all = false; el.textContent = '–'; el.className = 'lc-val empty'; }
+        else { sum += v; el.textContent = v; el.className = 'lc-val'; }
+      });
+      app.querySelector('#lc-total').textContent = all ? sum + ' / ' + maxTotal : '–';
+      send.disabled = !all || S.busy;
+      app.querySelector('#lc-hint').style.display = all ? 'none' : '';
+    }
+    function persist() {
+      var p = prog(q.qid);
+      p.ratings = S.ratings; p.note = S.note;
+      saveProg();
+    }
+    app.querySelectorAll('.lc-range').forEach(function (rg) {
+      var set = function () { S.ratings[rg.dataset.k] = Number(rg.value); persist(); refresh(); };
+      rg.addEventListener('input', set);
+      rg.addEventListener('pointerdown', set);
+      rg.addEventListener('keydown', set);
+      if (S.ratings[rg.dataset.k] != null) rg.value = S.ratings[rg.dataset.k];
+    });
+    var note = app.querySelector('#lc-note');
+    note.value = S.note || '';
+    note.oninput = function () { S.note = note.value; persist(); };
+    refresh();
+
+    app.querySelector('#lc-exit').onclick = function () { persist(); exitBack(); };
+
+    send.onclick = function () {
+      S.busy = true; send.disabled = true; send.textContent = 'Menyimpan…';
+      var payload = { qid: q.qid, actualSec: S.actual, ratings: S.ratings, note: S.note };
+      if (q.type === 'pg') payload.choice = S.choice; else payload.text = S.choice;
+      api('submit', payload).then(function (res) {
+        S.busy = false;
+        if (!res.ok) throw new Error(res.error || 'Gagal menyimpan.');
+        S.err = '';
+        dropProg(q.qid);
+        if (S.mode === 'reviewer') {
+          S.qs.shift(); S.batchDone += 1; S.choice = null;
+          if (S.qs.length) enterQuestion(true); // langsung ke soal berikutnya, tanpa konfirmasi lagi
+          else {
+            S.screen = 'done'; render();
+            // Refresh status singkat supaya info "Ambil soal baru" akurat.
+            api('status').then(function (st) {
+              if (st.ok) { S.hasNewBatchAvailable = !!st.hasNewBatchAvailable; if (S.screen === 'done') render(); }
+            }).catch(function () {});
+          }
+        } else {
+          S.adminSaved = { qid: q.qid, total: res.total };
+          S.adminListData.forEach(function (x) { if (x.qid === q.qid) x.mineDone = true; });
+          S.screen = 'adminnext'; render();
+        }
+      }).catch(function (e) {
+        S.busy = false;
+        if (isHandled(e)) return;
+        S.err = 'Penilaian belum tersimpan: ' + e.message + ' Periksa koneksi lalu tekan tombol kirim lagi.';
+        viewReview();
+      });
+    };
+  }
+
+  /* ====== VIEW: ADMIN, SETELAH MENILAI ====== */
+  function viewAdminNext() {
+    var saved = S.adminSaved || { qid: '', total: 0 };
+    var nxt = nextAdminQid(saved.qid);
+    app.innerHTML =
+      '<div class="lc-rule"></div><h2>Penilaian tersimpan</h2>' +
+      '<p style="margin:16px 0 26px">Soal ' + esc(saved.qid) + ' sudah kamu nilai dengan total <strong>' + esc(saved.total) + '</strong>.' +
+      (nxt ? '' : ' Tidak ada soal lagi setelah ini di daftar.') + '</p>' +
+      '<div class="lc-row">' +
+      (nxt ? '<button class="lc-btn" id="lc-next-q">Tinjau soal berikutnya (' + esc(nxt) + ')</button>' : '') +
+      '<button class="lc-btn ghost" id="lc-next">Kembali ke daftar soal</button>' +
+      '<button class="lc-btn ghost" id="lc-menu-back">Ke menu</button></div>';
+    bindNav();
+    app.querySelector('#lc-next').onclick = function () { openAdminList(); };
+    var nq = app.querySelector('#lc-next-q');
+    if (nq) nq.onclick = function () { openAdminQuestion(nxt, true); };
+  }
+
+  function viewDone() {
+    var newBtn = S.hasNewBatchAvailable
+      ? '<button class="lc-btn" id="lc-new">Ambil soal baru</button>'
+      : '';
+    app.innerHTML =
+      '<div class="lc-rule"></div><h1>Selesai</h1>' +
+      '<p style="margin:16px 0 26px">' + S.batchTotal + ' soal sudah kamu review dan semua nilai tersimpan di Google Sheets. Terima kasih, ' + esc(S.id) + '.</p>' +
+      '<div class="lc-row">' + newBtn +
+      '<button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
+      (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
+    var nb = app.querySelector('#lc-new');
+    if (nb) nb.onclick = function () { startBatch(true); };
+    bindNav();
+  }
+
+  /* ====== PENGATURAN PLATFORM (khusus admin) ======
+     Daftar setting, label, dan batas nilainya dikirim oleh server (SETTINGS di Code.gs),
+     jadi kalau ada setting baru di backend, halaman ini ikut menampilkannya sendiri. */
+  function applySettingsToConfig(list) {
+    (list || []).forEach(function (s) {
+      if (s.key === 'ESTIMASIMIN_DETIK') CONFIG.MIN_EST = s.value;
+      else if (s.key === 'ESTIMASIMAKS_DETIK') CONFIG.MAX_EST = s.value;
+      else if (s.key === 'MAKSGAMBAR') CONFIG.MAX_IMAGES = s.value;
+      else if (s.key === 'TOLERANSIWAKTU_PERSEN') CONFIG.TIME_TOLERANCE = s.value / 100;
+      else if (s.key === 'RUBRIKMIN') CONFIG.RUBRIC_MIN = s.value;
+      else if (s.key === 'RUBRIKMAKS') CONFIG.RUBRIC_MAX = s.value;
+      else if (s.key === 'BATCH') S.currentBatch = s.value;
+      else if (s.key === 'ENABLE_BUATSOAL') S.memberCreateOpen = !!s.value;
+      else if (s.key === 'TIPESOAL') S.allowedTypes = s.value;
+      else if (s.key === 'MAKSSOALPERBATCH') S.maxQuestionsPerBatch = s.value;
+      else if (s.key === 'ANGGOTA_LIHAT_ANGGOTA') S.membersOpen = S.role === 'admin' || !!s.value;
+    });
+  }
+  function takeSettings(res) {
+    S.setList = res.settings || [];
+    S.setVals = {};
+    S.setList.forEach(function (s) { S.setVals[s.key] = s.value; });
+    applySettingsToConfig(S.setList);
+  }
+  function openSettings() {
+    S.err = ''; S.setErr = ''; S.setMsg = '';
+    rememberScreen('settings');
+    viewLoading('Memuat pengaturan platform…');
+    api('settings_get').then(function (res) {
+      if (!res.ok) throw new Error(res.error || 'Gagal memuat pengaturan.');
+      takeSettings(res);
+      S.screen = 'settings'; render();
+    }).catch(function (e) {
+      if (isHandled(e)) return;
+      S.err = e.message; S.screen = 'menu'; loadStatus();
+    });
+  }
+
+  function viewSettings() {
+    var fields = S.setList.map(function (s) {
+      var v = S.setVals[s.key];
+      if (s.type === 'bool') {
+        return '<div class="lc-set"><label class="lc-toggle">' +
+          '<input type="checkbox" data-set="' + esc(s.key) + '"' + (v ? ' checked' : '') + '>' +
+          '<strong>' + esc(s.label) + '</strong></label>' +
+          '<p class="lc-mute">' + esc(s.help) + '</p></div>';
+      }
+      if (s.type === 'enum') {
+        var opts = (s.options || []).map(function (o) {
+          return '<option value="' + esc(o.value) + '"' + (v === o.value ? ' selected' : '') + '>' + esc(o.label) + '</option>';
+        }).join('');
+        return '<div class="lc-set"><label class="lc-label" for="set-' + esc(s.key) + '">' + esc(s.label) + '</label>' +
+          '<select class="lc-select" id="set-' + esc(s.key) + '" data-set="' + esc(s.key) + '">' + opts + '</select>' +
+          '<p class="lc-mute">' + esc(s.help) + '</p></div>';
+      }
+      var suffix = s.type === 'percent' ? '%' : '';
+      return '<div class="lc-set"><label class="lc-label" for="set-' + esc(s.key) + '">' + esc(s.label) + '</label>' +
+        '<div class="lc-setnum"><input class="lc-input" id="set-' + esc(s.key) + '" type="number" inputmode="numeric" ' +
+        'min="' + s.min + '" max="' + s.max + '" step="1" data-set="' + esc(s.key) + '" value="' + esc(v) + '">' +
+        (suffix ? '<span class="lc-mute">' + suffix + '</span>' : '') + '</div>' +
+        '<p class="lc-mute">' + esc(s.help) + ' Rentang ' + s.min + '–' + s.max + ', default: ' + esc(s.def) + '.</p></div>';
+    }).join('');
+
+    app.innerHTML = navBar() +
+      '<div class="lc-rule"></div><h2>Pengaturan platform</h2>' +
+      '<p class="lc-mute" style="margin-top:10px">Sama dengan tab <strong>Pengaturan</strong> di spreadsheet — perubahan di sini ' +
+      'langsung ditulis ke sana dan berlaku untuk semua orang tanpa deploy ulang. Hanya akun admin yang bisa membuka halaman ini.</p>' +
+      (S.setMsg ? '<div class="lc-notice" style="margin-top:14px"><p>' + esc(S.setMsg) + '</p></div>' : '') +
+      '<div class="lc-card" style="margin-top:16px">' + fields + '</div>' +
+      '<div class="lc-actions lc-row"><button class="lc-btn" id="lc-set-save">Simpan pengaturan</button>' +
+      '<button class="lc-btn ghost" id="lc-set-reload">Muat ulang</button>' +
+      '<button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
+      (S.setErr ? '<p class="lc-err" role="alert">' + esc(S.setErr) + '</p>' : '');
+
+    bindNav();
+    app.querySelectorAll('[data-set]').forEach(function (el) {
+      var key = el.getAttribute('data-set');
+      if (el.type === 'checkbox') el.onchange = function () { S.setVals[key] = el.checked; };
+      else if (el.tagName === 'SELECT') el.onchange = function () { S.setVals[key] = el.value; };
+      else el.oninput = function () { S.setVals[key] = el.value; };
+    });
+    app.querySelector('#lc-set-reload').onclick = openSettings;
+
+    var save = app.querySelector('#lc-set-save');
+    save.disabled = S.setBusy;
+    save.onclick = function () {
+      confirmBox({
+        title: 'Simpan pengaturan platform?',
+        text: 'Perubahan langsung berlaku untuk semua anggota, termasuk yang sedang membuka web app.',
+        detail: 'Mengubah "Batch aktif" membuat soal baru dan pembagian review pindah ke batch itu (batch 0 = Batch Trial). ' +
+          'Mengubah "Tipe soal" hanya membatasi tipe yang boleh dibuat ANGGOTA baru; soal yang sudah ada tidak terpengaruh. ' +
+          'Mengubah rentang nilai rubrik (RUBRIKMIN/RUBRIKMAKS) hanya berlaku untuk penilaian baru; penilaian lama yang sudah tersimpan tidak diskalakan ulang. ' +
+          'Menutup menu review atau pembuatan soal tidak menghapus progres yang sudah tersimpan.',
+        ok: 'Ya, simpan',
+        cancel: 'Periksa lagi',
+        onOk: function () {
+          S.setBusy = true; S.setErr = ''; S.setMsg = '';
+          save.disabled = true; save.textContent = 'Menyimpan…';
+          api('settings_save', { settings: S.setVals }).then(function (res) {
+            S.setBusy = false;
+            if (!res.ok) throw new Error(res.error || 'Gagal menyimpan pengaturan.');
+            takeSettings(res);
+            S.setMsg = res.message || 'Pengaturan tersimpan.';
+            viewSettings();
+          }).catch(function (e) {
+            S.setBusy = false;
+            if (isHandled(e)) return;
+            S.setErr = e.message;
+            viewSettings();
+          });
+        }
+      });
+    };
+  }
+
+  /* ====== "SOAL SAYA" (daftar + form buat/ubah) ====== */
+  function openMine() {
+    S.err = '';
+    rememberScreen('mine');
+    viewLoading('Memuat soal kamu…');
+    api('mine').then(function (res) {
+      if (!res.ok) throw new Error(res.error || 'Gagal memuat.');
+      S.mineList = res.questions; S.mineMade = res.made; S.mineMax = res.max;
+      S.mineMadeThisBatch = res.madeThisBatch || 0;
+      S.memberCreateOpen = res.memberCreateOpen;
+      S.allowedTypes = res.allowedTypes || 'KEDUANYA';
+      S.mineOverall = res.overall || null;
+      S.showReviewerNames = !!res.showReviewerNames;
+      S.namesBySetting = !!res.namesBySetting;
+      S.orphanReviews = res.orphanReviews || 0;
+      S.screen = 'mine'; render();
+    }).catch(function (e) {
+      if (isHandled(e)) return;
+      S.err = e.message; S.screen = 'menu'; loadStatus();
+    });
+  }
+  // Satu kotak statistik (angka besar + keterangan kecil)
+  function statBox(val, label) {
+    return '<div class="lc-stat"><b>' + esc(val) + '</b><span>' + esc(label) + '</span></div>';
+  }
+  // Satu review yang masuk ke soal saya
+  function reviewItem(r) {
+    return '<div class="lc-rv"><div class="lc-rv-h">' +
+      '<div><strong>' + esc(r.reviewer) + '</strong>' + (r.isAdmin ? ' <span class="lc-badge">Admin</span>' : '') +
+      '<p class="lc-rv-sub">' + esc(r.ts) + '</p></div>' +
+      '<span class="lc-rv-score">' + r.total + '</span></div>' +
+      '<p class="lc-rv-sub">Jawaban reviewer: ' + esc(r.jawaban || '–') + ' • Waktu pengerjaan ' + fmt(r.actual) + ' (estimasimu ' + fmt(r.est) + ') • ' +
+      'Jawaban ' + (r.correct ? 'benar' : 'salah') + '</p>' +
+      '<p class="lc-rv-sub">Correctness ' + r.c + ' • Clarity ' + r.cl + ' • Complexity ' + r.cx +
+      ' • Information ' + r.inf + ' • Time ' + r.time + '</p>' +
+      (r.note ? '<p class="lc-rv-note">“' + esc(r.note) + '”</p>' : '') +
+      '</div>';
+  }
+  // Blok review untuk satu soal: ringkasan + daftar yang bisa dibuka/tutup
+  function reviewBlock(q) {
+    var st = q.stats || { count: 0 };
+    if (!st.count) return '<p class="lc-rv-empty">Belum ada yang mereview soal ini.</p>';
+    var open = !!S.mineOpen[q.qid];
+    return '<div class="lc-stats" style="margin-top:10px">' +
+      statBox(st.count, 'review masuk') +
+      statBox(st.avgTotal, 'rata-rata skor') +
+      statBox(fmt(st.avgActual), 'rata-rata waktu') +
+      '</div>' +
+      '<button class="lc-btn ghost small" style="margin-top:10px" data-toggle="' + esc(q.qid) + '">' +
+      (open ? 'Sembunyikan ' + st.count + ' review' : 'Lihat ' + st.count + ' review') + '</button>' +
+      (open ? q.reviews.map(reviewItem).join('') : '');
+  }
+
+  function viewMine() {
+    var createOpen = S.role === 'admin' || S.memberCreateOpen;
+    var canAdd = createOpen && (S.role === 'admin' || !S.mineMax || S.mineMadeThisBatch < S.mineMax);
+    var rows = S.mineList.map(function (q) {
+      var canEdit = q.editable;
+      var typeBadge = '<span class="lc-badge">' + esc(typeLabel(q.type)) + '</span>';
+      var keyInfo = q.type === 'pg'
+        ? 'Kunci: ' + esc(q.answer)
+        : 'Jawaban diterima: ' + esc((q.answers || []).join(', ')) + (q.caseSensitive ? ' (case sensitive)' : ' (tidak case sensitive)');
+      return '<div class="lc-list-item lc-mine-item"><div class="lc-head"><div class="lc-meta">' +
+        '<p><strong>' + esc(q.qid) + '</strong> ' + typeBadge + ' • ' + esc(batchName(q.batch)) + '</p>' +
+        '<p class="lc-mute">' + esc(q.soal.slice(0, 90)) + (q.soal.length > 90 ? '…' : '') + '</p>' +
+        '<p class="lc-mute">' + keyInfo + ' • Estimasi: ' + q.est + ' dtk • ' +
+        (q.editable ? '<span class="lc-badge">Bisa diedit</span>' : '<span class="lc-badge">Terkunci</span>') + '</p>' +
+        '</div><button class="lc-btn small" data-qid="' + esc(q.qid) + '"' + (canEdit ? '' : ' disabled') + '>Edit</button></div>' +
+        reviewBlock(q) + '</div>';
+    }).join('') || '<p class="lc-mute">Kamu belum membuat soal.</p>';
+
+    // Ringkasan semua review yang masuk ke seluruh soal saya
+    var ov = S.mineOverall || { count: 0 };
+    var nameNote = S.role === 'admin'
+      ? 'Sebagai admin, kamu selalu melihat nama pereview yang sebenarnya.'
+      : (S.namesBySetting
+        ? 'Admin mengizinkan anggota melihat nama pereview.'
+        : 'Nama pereview disembunyikan; hanya admin yang bisa melihatnya.');
+    // Baris Review yang soalnya sudah tidak ada di tab Soal/SoalIsian (mis. barisnya dihapus)
+    var orphanNote = S.orphanReviews
+      ? '<div class="lc-notice" style="margin-top:14px"><p>' + S.orphanReviews +
+        ' review lain tercatat atas namamu, tapi soalnya sudah tidak ada di tab Soal/SoalIsian ' +
+        '(barisnya terhapus atau dikosongkan), jadi tidak ikut dihitung di sini. Hubungi admin kalau ini tidak seharusnya terjadi.</p></div>'
+      : '';
+    var overallCard = '';
+    if (ov.count) {
+      overallCard = '<div class="lc-card"><h3>Review yang masuk ke soalmu</h3>' +
+        '<div class="lc-stats">' +
+        statBox(ov.count, 'total review') +
+        statBox(ov.avgTotal, 'rata-rata skor') +
+        statBox(fmt(ov.avgActual), 'rata-rata waktu') +
+        statBox(ov.correctCount + '/' + ov.count, 'jawaban benar') +
+        '</div>' +
+        '<p class="lc-mute" style="margin:14px 0 0">Rata-rata dari semua penilaian pada semua soalmu. ' +
+        nameNote + '</p>' + orphanNote + '</div>';
+    } else {
+      overallCard = '<div class="lc-card"><h3>Review yang masuk ke soalmu</h3>' +
+        '<p class="lc-mute" style="margin:0">Belum ada review yang masuk. Hasil penilaian akan muncul di sini, ' +
+        'termasuk skor, waktu pengerjaan, dan catatan dari pereview.</p>' + orphanNote + '</div>';
+    }
+
+    var maxTxt = (S.role === 'admin' || !S.mineMax) ? 'tanpa batas per batch' : (S.mineMadeThisBatch + ' dari ' + S.mineMax + ' untuk batch ini');
+    var typeNote = S.role === 'admin' ? '' :
+      '<p class="lc-mute" style="margin-top:2px">Tipe soal yang bisa kamu buat: ' + esc(TYPE_LABELS[S.allowedTypes] || S.allowedTypes) + '.</p>';
+    app.innerHTML = navBar() +
+      '<div class="lc-rule"></div><h2>Soal saya</h2>' +
+      '<p class="lc-mute">' + maxTxt + '</p>' + typeNote +
+      (createOpen ? '' : '<div class="lc-notice"><p>Pembuatan soal baru sedang ditutup oleh admin.</p></div>') +
+      '<div class="lc-row" style="margin:14px 0"><button class="lc-btn" id="lc-add"' + (canAdd ? '' : ' disabled') + '>+ Buat soal baru</button>' +
+      '<button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
+      overallCard +
+      rows +
+      (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
+    bindNav();
+    app.querySelector('#lc-add').onclick = function () { openCreateForm(null); };
+    app.querySelectorAll('[data-qid]').forEach(function (b) {
+      b.onclick = function () { openCreateForm(b.getAttribute('data-qid')); };
+    });
+    app.querySelectorAll('[data-toggle]').forEach(function (b) {
+      b.onclick = function () {
+        var qid = b.getAttribute('data-toggle');
+        S.mineOpen[qid] = !S.mineOpen[qid];
+        viewMine();
+      };
+    });
+  }
+
+  // Tipe bawaan saat membuat soal baru, mengikuti pengaturan TIPESOAL.
+  function defaultCreateType() {
+    if (S.allowedTypes === 'PG') return 'pg';
+    if (S.allowedTypes === 'ISIAN') return 'isian';
+    return 'pg';
+  }
+
+  // Isi state form dari data satu soal. q berbentuk sama untuk "Soal saya" (mine)
+  // maupun admin_question_full: { qid, type, soal, est, images, options/answer | answers/caseSensitive }.
+  function fillForm(q) {
+    S.editingQid = q.qid; S.formType = q.type; S.formSoal = q.soal;
+    S.formOpts = { A: '', B: '', C: '', D: '', E: '' };
+    S.formAnswer = ''; S.formAnswers = ''; S.formCaseSensitive = false;
+    if (q.type === 'pg') {
+      (q.options || []).forEach(function (o) { S.formOpts[o.key] = o.text; });
+      S.formAnswer = q.answer || '';
+    } else {
+      S.formAnswers = (q.answers || []).join('\n');
+      S.formCaseSensitive = !!q.caseSensitive;
+    }
+    S.formEst = String(q.est);
+    S.formImagesKeep = (q.images || []).slice();
+  }
+
+  function openCreateForm(qid) {
+    S.formErr = ''; S.formImagesNew = [];
+    S.formOrigin = 'mine'; S.formCreator = ''; S.formBatch = 0;
+    if (qid) {
+      var q = S.mineList.find(function (x) { return x.qid === qid; });
+      if (!q) return;
+      fillForm(q);
+    } else {
+      S.editingQid = null;
+      S.formType = defaultCreateType();
+      S.formSoal = '';
+      S.formOpts = { A: '', B: '', C: '', D: '', E: '' };
+      S.formAnswer = ''; S.formAnswers = ''; S.formCaseSensitive = false;
+      S.formEst = ''; S.formImagesKeep = [];
+    }
+    S.screen = 'create'; render();
+  }
+
+  function viewCreate() {
+    var isEdit = !!S.editingQid;
+    var fromAdminList = S.formOrigin === 'adminlist';
+    var canPickType = !isEdit && (S.allowedTypes === 'KEDUANYA' || S.role === 'admin');
+    var typeSelector = '';
+    if (canPickType) {
+      typeSelector = '<div class="lc-fieldset"><label class="lc-label">Tipe soal</label>' +
+        '<div role="radiogroup" aria-label="Tipe soal">' +
+        '<label class="lc-opt"><input type="radio" name="lc-type" value="pg"' + (S.formType === 'pg' ? ' checked' : '') + '><span>Pilihan ganda</span></label>' +
+        '<label class="lc-opt"><input type="radio" name="lc-type" value="isian"' + (S.formType === 'isian' ? ' checked' : '') + '><span>Isian singkat</span></label>' +
+        '</div></div>';
+    } else if (isEdit) {
+      typeSelector = '<p class="lc-mute" style="margin-top:14px">Tipe soal: <strong>' + esc(typeLabel(S.formType)) + '</strong> (tidak bisa diubah).</p>';
+    } else {
+      typeSelector = '<p class="lc-mute" style="margin-top:14px">Tipe soal: <strong>' + esc(typeLabel(S.formType)) + '</strong> (admin membatasi tipe yang boleh dibuat saat ini).</p>';
+    }
+    // Admin mengedit soal milik orang lain dari daftar soal: tampilkan pemilik & batchnya.
+    var originNote = (isEdit && fromAdminList)
+      ? '<div class="lc-notice" style="margin-top:14px"><p>Kamu mengedit sebagai admin. Soal ini dibuat oleh <strong>' +
+        esc(S.formCreator || '–') + '</strong> untuk ' + esc(batchName(S.formBatch)) + '.</p></div>'
+      : '';
+
+    var typeFields;
+    if (S.formType === 'pg') {
+      var optsHtml = KEYS.map(function (k) {
+        return '<label class="lc-label" for="lc-opt-' + k + '">Pilihan ' + k + '</label>' +
+          '<input class="lc-input" id="lc-opt-' + k + '" maxlength="500" value="' + esc(S.formOpts[k]) + '" style="margin-bottom:12px">';
+      }).join('');
+      var answerHtml = '<div role="radiogroup" aria-label="Kunci jawaban">' + KEYS.map(function (k) {
+        return '<label class="lc-opt"><input type="radio" name="lc-answer" value="' + k + '"' + (S.formAnswer === k ? ' checked' : '') + '>' +
+          '<span><b>' + k + '</b></span></label>';
+      }).join('') + '</div>';
+      typeFields = '<div class="lc-fieldset">' + optsHtml + '</div>' +
+        '<div class="lc-fieldset"><label class="lc-label">Jawaban benar</label>' + answerHtml + '</div>';
+    } else {
+      typeFields = '<div class="lc-fieldset">' +
+        '<label class="lc-label" for="lc-answers">Jawaban yang diterima (satu per baris)</label>' +
+        '<textarea class="lc-textarea" id="lc-answers" maxlength="2000" placeholder="Tulis semua variasi jawaban yang benar, satu per baris.">' + esc(S.formAnswers) + '</textarea>' +
+        '<p class="lc-mute lc-hintline">Reviewer dianggap benar kalau jawabannya cocok dengan salah satu baris ini (maks. 20 variasi).</p></div>' +
+        '<div class="lc-fieldset"><label class="lc-toggle"><input type="checkbox" id="lc-cs"' + (S.formCaseSensitive ? ' checked' : '') + '> Perhatikan huruf besar/kecil (case sensitive)</label>' +
+        '<p class="lc-mute lc-hintline">Kalau tidak dicentang, "Pascal" dan "pascal" dianggap sama.</p></div>';
+    }
+
+    var keepThumbs = S.formImagesKeep.map(function (fid) {
+      return '<div class="lc-thumb" data-keep="' + esc(fid) + '"><img id="thumb-' + esc(fid) + '" alt="Gambar soal"><button type="button" data-remove-keep="' + esc(fid) + '">×</button></div>';
+    }).join('');
+    var newThumbs = S.formImagesNew.map(function (im, i) {
+      return '<div class="lc-thumb"><img src="' + im.preview + '" alt="Gambar baru"><button type="button" data-remove-new="' + i + '">×</button></div>';
+    }).join('');
+    var totalImgs = S.formImagesKeep.length + S.formImagesNew.length;
+
+    app.innerHTML = navBar() +
+      '<div class="lc-rule"></div><h2>' + (isEdit ? 'Ubah soal ' + esc(S.editingQid) : 'Buat soal baru') + '</h2>' +
+      originNote +
+      typeSelector +
+      '<div class="lc-fieldset" style="margin-top:18px"><label class="lc-label">Gambar (opsional, maks. ' + CONFIG.MAX_IMAGES + ')</label>' +
+      '<div class="lc-thumbs" id="lc-thumbs">' + keepThumbs + newThumbs + '</div>' +
+      '<label class="lc-btn ghost small lc-filebtn">+ Tambah gambar<input type="file" id="lc-imgpick" accept="image/*" multiple' + (totalImgs >= CONFIG.MAX_IMAGES ? ' disabled' : '') + '></label>' +
+      '<p class="lc-mute lc-hintline" id="lc-imghint"></p></div>' +
+      '<div class="lc-fieldset">' +
+      '<label class="lc-label" for="lc-soal">Soal</label>' +
+      '<textarea class="lc-textarea" id="lc-soal" maxlength="3000" placeholder="Tulis soal di sini. Bungkus kode Pascal dengan ``` di awal dan akhir agar tampil sebagai blok kode.">' + esc(S.formSoal) + '</textarea>' +
+      '<p class="lc-mute lc-hintline">5–3000 karakter.</p></div>' +
+      typeFields +
+      '<div class="lc-fieldset"><label class="lc-label" for="lc-est">Estimasi waktu pengerjaan (detik)</label>' +
+      '<input class="lc-input" id="lc-est" type="number" min="' + CONFIG.MIN_EST + '" max="' + CONFIG.MAX_EST + '" value="' + esc(S.formEst) + '">' +
+      '<p class="lc-mute lc-hintline">' + CONFIG.MIN_EST + '–' + CONFIG.MAX_EST + ' detik.</p></div>' +
+      '<div class="lc-actions lc-row"><button class="lc-btn" id="lc-save">' + (isEdit ? 'Perbarui soal' : 'Simpan soal') + '</button>' +
+      '<button class="lc-btn ghost" id="lc-cancel">Batal</button></div>' +
+      (S.formErr ? '<p class="lc-err" role="alert">' + esc(S.formErr) + '</p>' : '');
+
+    bindNav();
+    S.formImagesKeep.forEach(function (fid) {
+      fetchImg(fid).then(function () {
+        var im = app.querySelector('#thumb-' + fid);
+        if (im) im.src = (S.img[fid] && S.img[fid] !== 'err') ? S.img[fid] : '';
+      });
+    });
+
+    app.querySelector('#lc-soal').oninput = function (e) { S.formSoal = e.target.value; };
+    if (S.formType === 'pg') {
+      KEYS.forEach(function (k) { app.querySelector('#lc-opt-' + k).oninput = function (e) { S.formOpts[k] = e.target.value; }; });
+      app.querySelectorAll('input[name="lc-answer"]').forEach(function (r) { r.onchange = function () { S.formAnswer = r.value; }; });
+    } else {
+      app.querySelector('#lc-answers').oninput = function (e) { S.formAnswers = e.target.value; };
+      app.querySelector('#lc-cs').onchange = function (e) { S.formCaseSensitive = e.target.checked; };
+    }
+    if (canPickType) {
+      app.querySelectorAll('input[name="lc-type"]').forEach(function (r) {
+        r.onchange = function () { S.formType = r.value; viewCreate(); };
+      });
+    }
+    app.querySelector('#lc-est').oninput = function (e) { S.formEst = e.target.value; };
+    // Batal / selesai kembali ke tempat asal: daftar soal admin atau "Soal saya".
+    app.querySelector('#lc-cancel').onclick = function () {
+      if (fromAdminList) openAdminList();
+      else { S.screen = 'mine'; render(); }
+    };
+
+    app.querySelectorAll('[data-remove-keep]').forEach(function (b) {
+      b.onclick = function () {
+        var fid = b.getAttribute('data-remove-keep');
+        S.formImagesKeep = S.formImagesKeep.filter(function (x) { return x !== fid; });
+        viewCreate();
+      };
+    });
+    app.querySelectorAll('[data-remove-new]').forEach(function (b) {
+      b.onclick = function () {
+        S.formImagesNew.splice(Number(b.getAttribute('data-remove-new')), 1);
+        viewCreate();
+      };
+    });
+
+    var pick = app.querySelector('#lc-imgpick');
+    if (pick) pick.onchange = function () {
+      var hint = app.querySelector('#lc-imghint');
+      var files = Array.prototype.slice.call(pick.files || []);
+      var room = CONFIG.MAX_IMAGES - (S.formImagesKeep.length + S.formImagesNew.length);
+      if (files.length > room) { files = files.slice(0, room); hint.textContent = 'Hanya ' + room + ' gambar yang bisa ditambahkan (maks. ' + CONFIG.MAX_IMAGES + ').'; }
+      if (!files.length) return;
+      hint.textContent = 'Memproses gambar…';
+      Promise.all(files.map(function (f) { return compressImage(f); })).then(function (imgs) {
+        S.formImagesNew = S.formImagesNew.concat(imgs);
+        viewCreate();
+      }).catch(function (e) { hint.textContent = 'Gagal memproses gambar: ' + e.message; });
+    };
+
+    // Kirim ke server (dipanggil setelah pembuat soal menekan konfirmasi)
+    function doSave(soal, est) {
+      S.formErr = ''; S.formBusy = true;
+      var editQid = S.editingQid;
+      var save = app.querySelector('#lc-save'); save.disabled = true; save.textContent = 'Menyimpan…';
+      var payload = {
+        soal: soal, est: est,
+        images: S.formImagesNew.map(function (im) { return { mime: im.mime, data: im.data }; })
+      };
+      if (S.formType === 'pg') {
+        payload.type = 'pg'; payload.options = S.formOpts; payload.answer = S.formAnswer;
+      } else {
+        payload.type = 'isian';
+        payload.answers = S.formAnswers.split(/\r?\n/);
+        payload.caseSensitive = S.formCaseSensitive;
+      }
+      if (isEdit) { payload.qid = editQid; payload.keepImages = S.formImagesKeep; }
+      api(isEdit ? 'update' : 'create', payload).then(function (res) {
+        S.formBusy = false;
+        if (!res.ok) throw new Error(res.error || 'Gagal menyimpan soal.');
+        if (fromAdminList) {
+          // Isi soal berubah, jadi hasil pengecekan / progres lama untuk soal ini tidak berlaku lagi.
+          dropProg(editQid);
+          S.adminNote = { kind: 'ok', text: 'Soal ' + editQid + ' sudah diperbarui.' };
+          openAdminList();
+        } else {
+          openMine();
+        }
+      }).catch(function (e) {
+        S.formBusy = false;
+        if (isHandled(e)) return;
+        S.formErr = e.message;
+        viewCreate();
+      });
+    }
+
+    app.querySelector('#lc-save').onclick = function () {
+      var soal = S.formSoal.trim();
+      if (soal.length < 5 || soal.length > 3000) { S.formErr = 'Isi soal 5 sampai 3000 karakter.'; return viewCreate(); }
+      var est = Math.round(Number(S.formEst));
+      if (!(est >= CONFIG.MIN_EST && est <= CONFIG.MAX_EST)) { S.formErr = 'Estimasi waktu harus ' + CONFIG.MIN_EST + '–' + CONFIG.MAX_EST + ' detik.'; return viewCreate(); }
+
+      var ansList = [];
+      if (S.formType === 'pg') {
+        var filled = KEYS.filter(function (k) { return S.formOpts[k].trim(); });
+        if (filled.length < KEYS.length) { S.formErr = 'Isi semua pilihan jawaban (A sampai E).'; return viewCreate(); }
+        if (!S.formAnswer || !S.formOpts[S.formAnswer].trim()) { S.formErr = 'Pilih kunci jawaban dari pilihan yang terisi.'; return viewCreate(); }
+      } else {
+        ansList = S.formAnswers.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean);
+        if (!ansList.length) { S.formErr = 'Isi minimal satu jawaban yang diterima.'; return viewCreate(); }
+        if (ansList.length > 20) { S.formErr = 'Maksimal 20 variasi jawaban per soal.'; return viewCreate(); }
+      }
+
+      var nImg = S.formImagesKeep.length + S.formImagesNew.length;
+      confirmBox({
+        title: isEdit ? 'Perbarui soal ini?' : 'Simpan soal ini?',
+        text: isEdit
+          ? 'Perubahan akan menimpa isi soal sebelumnya.'
+          : 'Soal akan masuk ke ' + batchName(S.currentBatch) + ' dan bisa diberikan ke reviewer. Kemampuan mengedit setelah itu mengikuti pengaturan admin.',
+        detail: (S.formType === 'pg'
+          ? 'Kunci jawaban: ' + S.formAnswer
+          : 'Jumlah variasi jawaban: ' + ansList.length + (S.formCaseSensitive ? ' (case sensitive)' : ' (tidak case sensitive)')) +
+          ' • Estimasi: ' + est + ' detik • Gambar: ' + nImg + '. Pastikan semuanya sudah benar.',
+        ok: isEdit ? 'Ya, perbarui' : 'Ya, simpan',
+        cancel: 'Periksa lagi',
+        onOk: function () { doSave(soal, est); }
+      });
+    };
+  }
+
+  /* ====== ANGGOTA: daftar tim ====== */
+  // Label tiap kriteria urut. a = urutan normal, d = setelah dibalik. short = label dropdown.
+  var MEM_SORTS = [
+    { k: 'nama',   short: 'Nama',   a: 'Nama A–Z',                                   d: 'Nama Z–A' },
+    { k: 'status', short: 'Status', a: 'Online dan terakhir aktif paling baru dulu', d: 'Offline paling lama dulu' },
+    { k: 'review', short: 'Review', a: 'Yang belum mengerjakan review dulu',         d: 'Yang sudah selesai review dulu' },
+    { k: 'soal',   short: 'Soal',   a: 'Yang belum membuat soal dulu',               d: 'Yang paling banyak membuat soal dulu' }
+  ];
+
+  function stopMemTimer() { if (S.memTimer) { clearInterval(S.memTimer); S.memTimer = null; } }
+
+  // Sort dikirim ke server sebagai satu kriteria (kunci + arah). Backend tetap
+  // menerima array, jadi cukup dibungkus array berisi satu elemen.
+  function memPayload() {
+    var key = S.memSort[0] || 'nama';
+    var p = { sort: [{ key: key, desc: !!S.memDesc[key] }] };
+    if (S.memBatch != null) p.batch = S.memBatch;
+    return p;
+  }
+
+  // action: 'members' | 'members_hide'. silent = refresh otomatis (tanpa layar redup, tanpa render ulang kalau data sama).
+  function fetchMembers(action, extra, silent) {
+    var req = ++S.memReq;
+    if (!silent) { S.memBusy = true; S.memErr = ''; viewMembers(); }
+    return api(action, Object.assign(memPayload(), extra || {})).then(function (res) {
+      if (req !== S.memReq) return; // ada permintaan yang lebih baru
+      S.memBusy = false;
+      if (!res.ok && res.code === 'MEMBERS_CLOSED') {
+        stopMemTimer(); S.flash = res.error || 'Progres tim sedang ditutup oleh admin.'; loadStatus(); return;
+      }
+      if (!res.ok) throw new Error(res.error || 'Gagal memuat daftar anggota.');
+      var same = silent && S.memData && S.memData.batch === res.batch &&
+        JSON.stringify(S.memData.members) === JSON.stringify(res.members);
+      S.memData = res; S.memBatch = res.batch;
+      if (S.screen === 'members' && !same) viewMembers();
+    }).catch(function (e) {
+      if (req !== S.memReq) return;
+      S.memBusy = false;
+      if (isHandled(e) || silent) return;
+      S.memErr = e.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server.' : e.message;
+      if (S.screen === 'members') viewMembers();
+    });
+  }
+
+  function openMembers() {
+    S.err = ''; S.memErr = ''; S.memBatch = null; // selalu mulai dari batch aktif
+    rememberScreen('members');
+    viewLoading('Memuat daftar anggota…');
+    var req = ++S.memReq;
+    api('members', memPayload()).then(function (res) {
+      if (req !== S.memReq) return;
+      if (!res.ok) throw new Error(res.error || 'Gagal memuat daftar anggota.');
+      S.memData = res; S.memBatch = res.batch;
+      S.screen = 'members'; render();
+    }).catch(function (e) {
+      if (isHandled(e)) return;
+      S.flash = e.message; S.screen = 'menu'; loadStatus();
+    });
+  }
+
+  function memStatusHtml(m) {
+    if (m.online) return '<span class="lc-on"><i class="lc-dot on"></i>Online</span>';
+    return '<span class="lc-off"><i class="lc-dot"></i>' +
+      (m.lastSeenText ? 'Terakhir dilihat ' + esc(m.lastSeenText) : 'Belum pernah aktif') + '</span>';
+  }
+  function memSoalHtml(m) {
+    if (!m.required) return '<span class="lc-mute">—</span>';
+    return m.madeOk
+      ? '<strong class="lc-yes">✓ Sudah</strong><div class="lc-mute">' + m.made + ' soal</div>'
+      : '<strong class="lc-no">✗ Belum</strong>';
+  }
+  function memReviewHtml(m) {
+    if (!m.review) return '<span class="lc-mute">—</span>';
+    var r = m.review;
+    if (r.state === 'none') return '<strong class="lc-no">0/0</strong><div class="lc-mute">Belum mengambil soal</div>';
+    return '<strong class="' + (r.state === 'done' ? 'lc-yes' : '') + '">' + r.done + '/' + r.total + '</strong>' +
+      '<div class="lc-mute">' + (r.state === 'done' ? 'Selesai' : 'Belum selesai') + '</div>';
+  }
+
+  function viewMembers() {
+    if (!S.memData) return openMembers();
+    stopMemTimer();
+    var ae = document.activeElement, aid = ae && ae.id ? ae.id : ''; // jaga fokus keyboard saat render ulang
+    var d = S.memData, sm = d.summary || {}, isAdmin = S.role === 'admin';
+
+    // Batch Trial hanya muncul di daftar jika sedang aktif (server sudah menyaringnya).
+    var batchOpts = (d.batches || []).map(function (b) {
+      return '<option value="' + b + '"' + (b === d.batch ? ' selected' : '') + '>' + esc(batchName(b)) +
+        (b === d.currentBatch ? ' (aktif)' : '') + '</option>';
+    }).join('');
+
+    // Sorting: satu dropdown kriteria + satu tombol arah, ringkas untuk layar kecil.
+    var sortKey = S.memSort[0] || 'nama';
+    var sortSpecNow = MEM_SORTS.find(function (o) { return o.k === sortKey; }) || MEM_SORTS[0];
+    var sortDesc = !!S.memDesc[sortKey];
+    var sortOptions = MEM_SORTS.map(function (o) {
+      return '<option value="' + o.k + '"' + (o.k === sortKey ? ' selected' : '') + '>' + esc(o.short) + '</option>';
+    }).join('');
+    var sortHtml =
+      '<div class="lc-row" style="align-items:flex-end;margin-top:6px">' +
+      '<div><label class="lc-label" for="lc-mem-sortkey" style="margin-bottom:6px">Urutkan</label>' +
+      '<select class="lc-select" id="lc-mem-sortkey" style="max-width:180px">' + sortOptions + '</select></div>' +
+      '<button type="button" class="lc-btn small ghost" id="lc-mem-sortdir" aria-pressed="' + sortDesc + '">⇅ Balik</button>' +
+      '</div>' +
+      '<p class="lc-mute lc-hintline">' + esc(sortDesc ? sortSpecNow.d : sortSpecNow.a) + '</p>';
+
+    var hideBox = isAdmin
+      ? '<label class="lc-toggle" style="margin-top:16px"><input type="checkbox" id="lc-hideme"' + (d.meHidden ? ' checked' : '') + '> ' +
+        'Sembunyikan akun admin saya dari daftar anggota</label>' +
+        '<p class="lc-mute lc-hintline">Anggota biasa tidak akan melihat akunmu di tabel ini. Sesama admin tetap melihatnya.</p>'
+      : '';
+
+    var rows = (d.members || []).map(function (m) {
+      return '<tr' + (m.me ? ' class="me"' : '') + '><td>' +
+        '<div class="lc-mname"><strong>' + esc(m.nama) + '</strong>' + (m.me ? ' <span class="lc-mute">(kamu)</span>' : '') +
+        ' <span class="lc-badge">' + (m.role === 'admin' ? 'Admin' : 'Anggota') + '</span>' +
+        (m.hidden ? ' <span class="lc-badge">Disembunyikan dari anggota</span>' : '') + '</div>' +
+        '<div class="lc-mstat">' + memStatusHtml(m) + '</div></td>' +
+        '<td>' + memSoalHtml(m) + '</td><td>' + memReviewHtml(m) + '</td></tr>';
+    }).join('') || '<tr><td colspan="3" class="lc-mute">Belum ada anggota.</td></tr>';
+
+    var topRow =
+      '<div class="lc-mem-toprow">' +
+      '<div class="lc-mem-batchbox"><label class="lc-label" for="lc-mem-batch">Riwayat batch</label>' +
+      '<select class="lc-select" id="lc-mem-batch">' + batchOpts + '</select></div>' +
+      '<div class="lc-mem-sortbox">' + sortHtml + '</div>' +
+      '</div>';
+
+    app.innerHTML = navBar() +
+      '<div class="lc-rule"></div><h2>Progres Tim</h2>' +
+      '<p class="lc-mute" style="margin-top:10px">' + sm.online + ' dari ' + sm.total + ' online • ' +
+      sm.madeOk + '/' + sm.required + ' sudah membuat soal • ' + sm.reviewDone + '/' + sm.required + ' selesai review (' + esc(batchName(d.batch)) + ')</p>' +
+      (d.isCurrent ? '' : '<div class="lc-notice" style="margin-top:12px"><p>Kamu melihat riwayat ' + esc(batchName(d.batch)) +
+        '. Status online selalu kondisi saat ini; batch aktif sekarang adalah ' + esc(batchName(d.currentBatch)) + '.</p></div>') +
+      '<div class="lc-card" style="margin-top:14px">' + topRow + hideBox + '</div>' +
+      '<div class="lc-row"><button class="lc-btn ghost small" id="lc-mem-reload">Muat ulang</button>' +
+      '<span class="lc-mute" role="status">' + (S.memBusy ? 'Memperbarui…' : 'Diperbarui otomatis tiap 30 detik.') + '</span></div>' +
+      '<div class="lc-tablewrap' + (S.memBusy ? ' lc-mem-dim' : '') + '"><table class="lc-table"><thead><tr>' +
+      '<th>Anggota</th><th>Soal (' + esc(batchName(d.batch)) + ')</th><th>Review (' + esc(batchName(d.batch)) + ')</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="lc-row"><button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
+      (S.memErr ? '<p class="lc-err" role="alert">' + esc(S.memErr) + '</p>' : '');
+
+    bindNav();
+    app.querySelector('#lc-mem-batch').onchange = function (e) { S.memBatch = Number(e.target.value); fetchMembers('members'); };
+    app.querySelector('#lc-mem-sortkey').onchange = function (e) {
+      S.memSort = [e.target.value];
+      fetchMembers('members');
+    };
+    app.querySelector('#lc-mem-sortdir').onclick = function () {
+      S.memDesc[sortKey] = !S.memDesc[sortKey];
+      fetchMembers('members');
+    };
+    var hm = app.querySelector('#lc-hideme');
+    if (hm) hm.onchange = function () { fetchMembers('members_hide', { hidden: hm.checked }); };
+    app.querySelector('#lc-mem-reload').onclick = function () { fetchMembers('members'); };
+
+    // Refresh otomatis supaya status online / progres tetap segar
+    S.memTimer = setInterval(function () {
+      if (S.screen === 'members' && !S.memBusy) fetchMembers('members', null, true);
+    }, 30000);
+
+    if (aid) { var f = app.querySelector('#' + aid); if (f && f.focus) f.focus(); }
+  }
+
+  /* ====== FLOW ====== */
+  var firstRender = true;
+  function render() {
+    stopTimer();
+    stopFunLoader();
+    if (!firstRender) { try { app.scrollIntoView({ block: 'start' }); } catch (e) {} }
+    firstRender = false;
+    if (S.screen === 'login') return viewLogin();
+    if (S.screen === 'menu') return viewMenu();
+    if (S.screen === 'ready') return viewReady();
+    if (S.screen === 'question') return viewQuestion();
+    if (S.screen === 'review') return viewReview();
+    if (S.screen === 'adminnext') return viewAdminNext();
+    if (S.screen === 'done') return viewDone();
+    if (S.screen === 'mine') return viewMine();
+    if (S.screen === 'create') return viewCreate();
+    if (S.screen === 'adminlist') return viewAdminList();
+    if (S.screen === 'settings') return viewSettings();
+    if (S.screen === 'members') return viewMembers();
+  }
+
+  // Ping langsung saat tab dibuka kembali, supaya status online cepat pulih
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && S.token && S.screen !== 'login') api('ping').catch(function () {});
+  });
+
+  initTheme(); // tema dulu (bawaan terang), baru layar pertama digambar
+  if (S.token) { loadProg(); loadStatus(true); } else render();
+})();
+</script>
+</body>
+</html>
