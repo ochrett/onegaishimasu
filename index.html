@@ -385,7 +385,7 @@
     // form buat/ubah soal
     editingQid: null, formOrigin: 'mine', formCreator: '', formBatch: 0,
     formType: 'pg', formSoal: '', formOpts: { A: '', B: '', C: '', D: '', E: '' }, formAnswer: '',
-    formAnswers: '', formCaseSensitive: false,
+    formAnswers: '', formCaseSensitive: false, formAssigned: false,
     formEst: '', formImagesKeep: [], formImagesNew: [], formBusy: false, formErr: ''
   };
 
@@ -430,6 +430,12 @@
   function clearSession() {
     try { sessionStorage.removeItem('lc_token'); sessionStorage.removeItem('lc_id'); } catch (e) {}
     S.token = ''; S.id = '';
+    // Bersihkan state sesi soal juga, supaya akun berikutnya yang login di tab
+    // yang sama tidak mewarisi mode/reviewMode dari akun sebelumnya.
+    S.mode = 'reviewer'; S.reviewMode = 'rate'; S.adminParticipate = true;
+    S.qs = []; S.choice = null; S.key = ''; S.est = 0; S.correct = false; S.actual = 0;
+    S.ratings = {}; S.note = ''; S.started = false; S.stopped = false;
+    S.editingQid = null; S.adminSaved = null;
     stopPing(); stopMemTimer();
   }
 
@@ -457,12 +463,14 @@
 
   // Heartbeat: memberi tahu server bahwa kamu masih membuka aplikasi (dipakai status online di menu Anggota)
   var pingTimer = null;
+  var PING_INTERVAL_MS = 180000; // 3 menit (dulu 60 detik) — hemat kuota eksekusi harian
   function startPing() {
     if (pingTimer || !S.token) return;
     pingTimer = setInterval(function () {
       if (!S.token) return stopPing();
+      if (document.hidden) return; // tab tidak aktif: jangan ping, hemat kuota
       api('ping').catch(function () {});
-    }, 60000);
+    }, PING_INTERVAL_MS);
   }
   function stopPing() { if (pingTimer) { clearInterval(pingTimer); pingTimer = null; } }
 
@@ -508,14 +516,24 @@
   function prog(qid) { return S.prog[qid] || (S.prog[qid] = {}); }
   function dropProg(qid) { delete S.prog[qid]; saveProg(); }
 
+  /** Ubah Response fetch jadi JSON dengan aman. Kalau isinya bukan JSON valid
+   *  (server sedang sibuk dan sesaat membalas halaman HTML), lempar pesan yang jelas
+   *  alih-alih membiarkan SyntaxError mentah bocor ke pengguna. PENTING: tidak
+   *  menghapus sesi di sini — token kemungkinan besar masih sah, ini cuma gangguan sesaat. */
+  function parseJsonResponse(r) {
+    return r.text().then(function (t) {
+      try { return JSON.parse(t); }
+      catch (e) { throw new Error('Gangguan jaringan sesaat. Coba lagi.'); }
+    });
+  }
   function apiLogin(id, kode) {
     return fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'login', id: id, kode: kode }) })
-      .then(function (r) { return r.json(); });
+      .then(parseJsonResponse);
   }
-  function api(action, data) {
+  function api(action, data, _retry) {
     var body = Object.assign({ action: action, token: S.token }, data || {});
     return fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify(body) })
-      .then(function (r) { return r.json(); })
+      .then(parseJsonResponse)
       .then(function (res) {
         if (!res.ok && res.code === 'SESSION') {
           clearSession();
@@ -529,6 +547,17 @@
           S.flash = res.error || 'Menu review sedang ditutup.';
           loadStatus();
           throw new Error('CLOSED');
+        }
+        // Server sedang sibuk (lock tidak didapat) — coba lagi otomatis 1-2 kali
+        // dengan jeda singkat, sebelum menyerah dan meneruskan error ke pemanggil.
+        if (!res.ok && res.code === 'BUSY') {
+          var n = _retry || 0;
+          if (n < 2) {
+            var delay = 800 + n * 700; // percobaan ke-1: 800ms, ke-2: 1500ms
+            return new Promise(function (resolve) {
+              setTimeout(function () { resolve(api(action, data, n + 1)); }, delay);
+            });
+          }
         }
         return res;
       });
@@ -706,6 +735,13 @@
       apiLogin(id, kode).then(function (res) {
         if (!res.ok) throw new Error(res.error || 'Gagal masuk.');
         S.id = res.id; S.token = res.token; S.nama = res.nama; S.role = res.role;
+        // Bersihkan state sesi soal dari akun sebelumnya (kalau tab ini sebelumnya
+        // dipakai akun lain, mis. admin logout lalu anggota login di tab yang sama
+        // tanpa reload halaman) supaya tidak "mewarisi" mode admin/peek.
+        S.mode = 'reviewer'; S.reviewMode = 'rate'; S.adminParticipate = true;
+        S.qs = []; S.choice = null; S.key = ''; S.est = 0; S.correct = false; S.actual = 0;
+        S.ratings = {}; S.note = ''; S.started = false; S.stopped = false;
+        S.editingQid = null; S.adminSaved = null;
         saveSession();
         loadProg();
         loadStatus();
@@ -728,9 +764,16 @@
   // resumeAfterLogin = true: setelah status berhasil dimuat, buka kembali layar
   // menu terakhir yang dikunjungi akun ini (dipakai saat baru login / buka tab).
   function loadStatus(resumeAfterLogin) {
+    S.reloadResume = !!resumeAfterLogin;
     if (!S.token) { S.screen = 'login'; return render(); }
     viewLoading('Menyiapkan akunmu…');
-    api('config').catch(function () { return null; }).then(function (cfg) {
+    // config & status tidak saling bergantung, jadi dijalankan BERSAMAAN (bukan berurutan)
+    // supaya waktu tunggu total = permintaan yang paling lambat, bukan jumlah keduanya.
+    Promise.all([
+      api('config').catch(function () { return null; }),
+      api('status')
+    ]).then(function (results) {
+      var cfg = results[0], res = results[1];
       if (cfg && cfg.ok) {
         // Sinkronkan batas yang bisa diatur admin lewat tab Pengaturan di Sheets,
         // supaya hint di form (estimasi waktu, jumlah gambar, rentang rubrik) selalu sesuai.
@@ -739,7 +782,7 @@
         if (cfg.rubricMin != null) CONFIG.RUBRIC_MIN = cfg.rubricMin;
         if (cfg.rubricMax != null) CONFIG.RUBRIC_MAX = cfg.rubricMax;
       }
-      return api('status');
+      return res;
     }).then(function (res) {
       if (!res.ok) throw new Error(res.error || 'Gagal memuat status.');
       S.id = res.id; S.nama = res.nama || ''; S.role = res.role;
@@ -758,7 +801,11 @@
       S.screen = 'menu'; render();
     }).catch(function (e) {
       if (isHandled(e)) return;
-      S.err = e.message; S.screen = 'login'; render();
+      // Gangguan jaringan/parsing sesaat TIDAK berarti sesi habis — token yang ada
+      // masih sah. Jangan paksa ke layar Login (itu membuang token yang masih valid);
+      // tampilkan layar "coba lagi" supaya pengguna bisa mengulang tanpa login ulang.
+      S.err = e.message;
+      S.screen = 'reload'; render();
     });
   }
 
@@ -945,8 +992,11 @@
       S.qs = res.questions; S.batchTotal = res.batchTotal; S.batchDone = res.batchDone;
       S.batch = res.batch; S.choice = null;
       if (!S.qs.length) { S.hasNewBatchAvailable = false; S.screen = 'done'; return render(); }
-      viewLoading('Menyiapkan gambar soal…');
-      return preloadAllImages(S.qs).then(function () { enterQuestion(); });
+      // Tidak lagi preload semua gambar batch di sini — cukup gambar soal pertama saja,
+      // dan viewQuestion() sudah menangani itu sendiri (plus prefetch soal berikutnya
+      // di background). Preload semua gambar sekaligus di sini justru bikin masuk soal
+      // pertama terasa lama kalau soalnya banyak/bergambar.
+      enterQuestion();
     }).catch(function (e) {
       if (isHandled(e)) return;
       S.err = e.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server.' : e.message;
@@ -1006,7 +1056,8 @@
     var rows = filtered.map(function (q) {
       var hasProg = !!S.prog[q.qid];
       return '<div class="lc-list-item"><div class="lc-meta">' +
-        '<p><strong>' + esc(q.qid) + '</strong> <span class="lc-badge">' + esc(typeLabel(q.type)) + '</span> — dibuat oleh ' + esc(q.creator) + ' • ' + esc(batchName(q.batch)) + '</p>' +
+        '<p><strong>' + esc(q.qid) + '</strong> <span class="lc-badge">' + esc(typeLabel(q.type)) + '</span> — dibuat oleh ' + esc(q.creator) + ' • ' + esc(batchName(q.batch)) +
+        (q.assigned === false ? ' <span class="lc-badge">Belum ditugaskan</span>' : '') + '</p>' +
         '<p class="lc-mute">' + esc(q.preview) + (q.preview.length >= 90 ? '…' : '') + '</p>' +
         '<p class="lc-mute">' + q.reviews + ' review dari anggota lain' + (q.mineDone ? ' • sudah kamu nilai' : '') +
         (hasProg ? ' • <span class="lc-badge">Ada progres tersimpan</span>' : '') + '</p>' +
@@ -1030,6 +1081,7 @@
 
     app.innerHTML = navBar() +
       '<div class="lc-rule"></div><h2>Daftar soal (admin)</h2>' +
+      '<div class="lc-row" style="margin:14px 0"><button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
       '<label class="lc-toggle" style="margin:14px 0"><input type="checkbox" id="lc-participate"' + (S.adminParticipate ? ' checked' : '') + '> Ikut menilai saat meninjau</label>' +
       (note ? (note.kind === 'err'
         ? '<p class="lc-err" role="alert">' + esc(note.text) + '</p>'
@@ -1044,7 +1096,6 @@
       (filterActive ? '<button type="button" class="lc-btn ghost small" id="lc-adm-reset">Reset pencarian dan filter</button>' : '') +
       '</div></div>' +
       '<div>' + rows + '</div>' +
-      '<div class="lc-row" style="margin-top:10px"><button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
       (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
     bindNav();
     app.querySelector('#lc-participate').onchange = function (e) { S.adminParticipate = e.target.checked; };
@@ -1079,8 +1130,9 @@
       S.mode = 'admin';
       S.reviewMode = S.adminParticipate ? 'rate' : 'peek';
       S.qs = [res.question]; S.choice = null;
-      viewLoading('Menyiapkan gambar soal…');
-      return preloadAllImages(S.qs).then(function () { enterQuestion(skipReady); });
+      // Admin cuma buka 1 soal di sini, jadi tidak perlu preload terpisah —
+      // viewQuestion() sudah memuat gambar soal ini sendiri.
+      enterQuestion(skipReady);
     }).catch(function (e) {
       if (isHandled(e)) return;
       S.adminNote = { kind: 'err', text: e.message };
@@ -1283,7 +1335,7 @@
       'Waktumu ' + fmt(S.actual) + ', estimasi pembuat ' + fmt(S.est) + '. Skor Time: <strong>' + tScore + '</strong>/100.</div>' +
       keyBlock;
 
-    if (S.reviewMode === 'peek') {
+    if (S.mode === 'admin' && S.role === 'admin' && S.reviewMode === 'peek') {
       var nxtPeek = nextAdminQid(q.qid);
       app.innerHTML =
         '<div class="lc-rule"></div><h2>Hasil — ' + esc(q.qid) + '</h2>' +
@@ -1318,10 +1370,10 @@
       '<div class="lc-crit"><label class="lc-label" for="lc-note">Catatan untuk pembuat soal (opsional)</label>' +
       '<textarea class="lc-textarea" id="lc-note" maxlength="1000"></textarea></div>' +
       '<div class="lc-total"><strong>Total</strong><span class="lc-val" id="lc-total">–</span></div>' +
-      '<div class="lc-row lc-pause"><button class="lc-btn ghost small" id="lc-exit">Keluar, lanjutkan nanti</button>' +
-      '<span class="lc-mute">Nilai dan catatan yang sudah kamu isi tetap tersimpan di browser ini.</span></div>' +
       '<div class="lc-actions lc-row"><button class="lc-btn" id="lc-send" disabled>' + nextLabel + '</button>' +
       '<span class="lc-mute" id="lc-hint">Geser keempat slider untuk mengaktifkan tombol.</span></div>' +
+      '<div class="lc-row lc-pause" style="margin-top:14px"><button class="lc-btn ghost small" id="lc-exit">Keluar, lanjutkan nanti</button>' +
+      '<span class="lc-mute">Nilai dan catatan yang sudah kamu isi tetap tersimpan di browser ini.</span></div>' +
       (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
 
     loadImgs(q);
@@ -1404,6 +1456,21 @@
     app.querySelector('#lc-next').onclick = function () { openAdminList(); };
     var nq = app.querySelector('#lc-next-q');
     if (nq) nq.onclick = function () { openAdminQuestion(nxt, true); };
+  }
+
+  function viewReload() {
+    app.innerHTML =
+      '<div class="lc-rule"></div><h2>Gangguan sambungan</h2>' +
+      '<p style="margin:16px 0 26px">' + esc(S.err || 'Terjadi gangguan sesaat saat memuat data.') +
+      ' Kamu tidak perlu masuk lagi — coba muat ulang.</p>' +
+      '<div class="lc-row"><button class="lc-btn" id="lc-reload-retry">Coba lagi</button>' +
+      '<button class="lc-btn ghost" id="lc-reload-logout">Keluar dan masuk lagi</button></div>';
+    app.querySelector('#lc-reload-retry').onclick = function () { loadStatus(S.reloadResume); };
+    app.querySelector('#lc-reload-logout').onclick = function () {
+      api('logout').catch(function () {});
+      forgetLastScreen();
+      clearSession(); S.screen = 'login'; S.err = ''; render();
+    };
   }
 
   function viewDone() {
@@ -1529,6 +1596,7 @@
 
     app.innerHTML = navBar() +
       '<div class="lc-rule"></div><h2>Audit log</h2>' +
+      '<div class="lc-row" style="margin:14px 0"><button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
       '<p class="lc-mute" style="margin-top:10px">Riwayat aktivitas semua akun, tersimpan di tab <strong>AuditLog</strong> pada spreadsheet. ' +
       'Kode akses dan isi catatan review tidak pernah dicatat.</p>' +
       '<div class="lc-search"><label class="lc-label" for="lc-aud-search">Cari log</label>' +
@@ -1541,8 +1609,7 @@
       '<div class="lc-row" style="margin-top:8px" id="lc-aud-info"></div></div>' +
       '<div id="lc-aud-list"></div>' +
       '<div class="lc-row" id="lc-aud-more" style="margin:6px 0 10px"></div>' +
-      '<div class="lc-row" style="margin-top:10px"><button class="lc-btn ghost" id="lc-aud-reload">Muat ulang</button>' +
-      '<button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>';
+      '<div class="lc-row" style="margin-top:10px"><button class="lc-btn ghost" id="lc-aud-reload">Muat ulang</button></div>';
     bindNav();
 
     app.querySelector('#lc-aud-search').oninput = function (e) {
@@ -1624,13 +1691,13 @@
 
     app.innerHTML = navBar() +
       '<div class="lc-rule"></div><h2>Pengaturan platform</h2>' +
+      '<div class="lc-row" style="margin:14px 0"><button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
       '<p class="lc-mute" style="margin-top:10px">Sama dengan tab <strong>Pengaturan</strong> di spreadsheet — perubahan di sini ' +
       'langsung ditulis ke sana dan berlaku untuk semua orang tanpa deploy ulang. Hanya akun admin yang bisa membuka halaman ini.</p>' +
       (S.setMsg ? '<div class="lc-notice" style="margin-top:14px"><p>' + esc(S.setMsg) + '</p></div>' : '') +
       '<div class="lc-card" style="margin-top:16px">' + fields + '</div>' +
       '<div class="lc-actions lc-row"><button class="lc-btn" id="lc-set-save">Simpan pengaturan</button>' +
-      '<button class="lc-btn ghost" id="lc-set-reload">Muat ulang</button>' +
-      '<button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
+      '<button class="lc-btn ghost" id="lc-set-reload">Muat ulang</button></div>' +
       (S.setErr ? '<p class="lc-err" role="alert">' + esc(S.setErr) + '</p>' : '');
 
     bindNav();
@@ -1762,11 +1829,12 @@
     var rows = S.mineList.map(function (q) {
       var canEdit = q.editable;
       var typeBadge = '<span class="lc-badge">' + esc(typeLabel(q.type)) + '</span>';
+      var assignBadge = (S.role === 'admin' && q.assigned === false) ? ' <span class="lc-badge">Belum ditugaskan</span>' : '';
       var keyInfo = q.type === 'pg'
         ? 'Kunci: ' + esc(q.answer)
         : 'Jawaban diterima: ' + esc((q.answers || []).join(', ')) + (q.caseSensitive ? ' (case sensitive)' : ' (tidak case sensitive)');
       return '<div class="lc-list-item lc-mine-item"><div class="lc-head"><div class="lc-meta">' +
-        '<p><strong>' + esc(q.qid) + '</strong> ' + typeBadge + ' • ' + esc(batchName(q.batch)) + '</p>' +
+        '<p><strong>' + esc(q.qid) + '</strong> ' + typeBadge + assignBadge + ' • ' + esc(batchName(q.batch)) + '</p>' +
         '<p class="lc-mute">' + esc(q.soal.slice(0, 90)) + (q.soal.length > 90 ? '…' : '') + '</p>' +
         '<p class="lc-mute">' + keyInfo + ' • Estimasi: ' + q.est + ' dtk • ' +
         (q.editable ? '<span class="lc-badge">Bisa diedit</span>' : '<span class="lc-badge">Terkunci</span>') + '</p>' +
@@ -1852,6 +1920,7 @@
     S.editingQid = q.qid; S.formType = q.type; S.formSoal = q.soal;
     S.formOpts = { A: '', B: '', C: '', D: '', E: '' };
     S.formAnswer = ''; S.formAnswers = ''; S.formCaseSensitive = false;
+    S.formAssigned = q.assigned !== false;
     if (q.type === 'pg') {
       (q.options || []).forEach(function (o) { S.formOpts[o.key] = o.text; });
       S.formAnswer = q.answer || '';
@@ -1876,6 +1945,7 @@
       S.formSoal = '';
       S.formOpts = { A: '', B: '', C: '', D: '', E: '' };
       S.formAnswer = ''; S.formAnswers = ''; S.formCaseSensitive = false;
+      S.formAssigned = false; // admin: soal baru default TIDAK ditugaskan ke anggota
       S.formEst = ''; S.formImagesKeep = [];
     }
     S.screen = 'create'; render();
@@ -1901,6 +1971,19 @@
     var originNote = (isEdit && fromAdminList)
       ? '<div class="lc-notice" style="margin-top:14px"><p>Kamu mengedit sebagai admin. Soal ini dibuat oleh <strong>' +
         esc(S.formCreator || '–') + '</strong> untuk ' + esc(batchName(S.formBatch)) + '.</p></div>'
+      : '';
+
+    // Khusus admin: apakah soal ini ditugaskan ke anggota untuk direview.
+    // Soal baru (create) default OFF; anggota tidak melihat kontrol ini sama sekali.
+    var assignToggle = S.role === 'admin'
+      ? '<div class="lc-notice" style="margin-top:14px"><label class="lc-toggle">' +
+        '<input type="checkbox" id="lc-assigned"' + (S.formAssigned ? ' checked' : '') + '>' +
+        '<strong>Tugaskan ke anggota (bisa direview)</strong></label>' +
+        '<p class="lc-mute" style="margin:6px 0 0">' +
+        (S.formAssigned
+          ? 'Soal ini masuk antrean review anggota.'
+          : 'Soal ini TIDAK masuk antrean review anggota sampai kamu menyalakan ini. Kamu tetap bisa membukanya sendiri dari daftar soal.') +
+        '</p></div>'
       : '';
 
     var typeFields;
@@ -1935,6 +2018,7 @@
     app.innerHTML = navBar() +
       '<div class="lc-rule"></div><h2>' + (isEdit ? 'Ubah soal ' + esc(S.editingQid) : 'Buat soal baru') + '</h2>' +
       originNote +
+      assignToggle +
       typeSelector +
       '<div class="lc-fieldset" style="margin-top:18px"><label class="lc-label">Gambar (opsional, maks. ' + CONFIG.MAX_IMAGES + ')</label>' +
       '<div class="lc-thumbs" id="lc-thumbs">' + keepThumbs + newThumbs + '</div>' +
@@ -1972,6 +2056,10 @@
       app.querySelectorAll('input[name="lc-type"]').forEach(function (r) {
         r.onchange = function () { S.formType = r.value; viewCreate(); };
       });
+    }
+    if (S.role === 'admin') {
+      var asC = app.querySelector('#lc-assigned');
+      if (asC) asC.onchange = function () { S.formAssigned = asC.checked; viewCreate(); };
     }
     app.querySelector('#lc-est').oninput = function (e) { S.formEst = e.target.value; };
     // Batal / selesai kembali ke tempat asal: daftar soal admin atau "Soal saya".
@@ -2024,6 +2112,7 @@
         payload.answers = S.formAnswers.split(/\r?\n/);
         payload.caseSensitive = S.formCaseSensitive;
       }
+      if (S.role === 'admin') payload.assigned = S.formAssigned;
       if (isEdit) { payload.qid = editQid; payload.keepImages = S.formImagesKeep; }
       api(isEdit ? 'update' : 'create', payload).then(function (res) {
         S.formBusy = false;
@@ -2208,6 +2297,7 @@
 
     app.innerHTML = navBar() +
       '<div class="lc-rule"></div><h2>Progres Tim</h2>' +
+      '<div class="lc-row" style="margin:14px 0"><button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
       '<p class="lc-mute" style="margin-top:10px">' + sm.online + ' dari ' + sm.total + ' online • ' +
       sm.madeOk + '/' + sm.required + ' sudah membuat soal • ' + sm.reviewDone + '/' + sm.required + ' selesai review (' + esc(batchName(d.batch)) + ')</p>' +
       (d.isCurrent ? '' : '<div class="lc-notice" style="margin-top:12px"><p>Kamu melihat riwayat ' + esc(batchName(d.batch)) +
@@ -2217,7 +2307,6 @@
       '<span class="lc-mute" role="status">' + (S.memBusy ? 'Memperbarui…' : 'Diperbarui otomatis tiap 30 detik.') + '</span></div>' +
       '<div class="lc-tablewrap' + (S.memBusy ? ' lc-mem-dim' : '') + '"><table class="lc-table"><thead><tr>' +
       '<th>Anggota</th><th>Soal (' + esc(batchName(d.batch)) + ')</th><th>Review (' + esc(batchName(d.batch)) + ')</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-      '<div class="lc-row"><button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
       (S.memErr ? '<p class="lc-err" role="alert">' + esc(S.memErr) + '</p>' : '');
 
     bindNav();
@@ -2236,8 +2325,8 @@
 
     // Refresh otomatis supaya status online / progres tetap segar
     S.memTimer = setInterval(function () {
-      if (S.screen === 'members' && !S.memBusy) fetchMembers('members', null, true);
-    }, 30000);
+      if (S.screen === 'members' && !S.memBusy && !document.hidden) fetchMembers('members', null, true);
+    }, 60000); // dulu 30 detik
 
     if (aid) { var f = app.querySelector('#' + aid); if (f && f.focus) f.focus(); }
   }
@@ -2262,6 +2351,7 @@
     if (S.screen === 'settings') return viewSettings();
     if (S.screen === 'audit') return viewAudit();
     if (S.screen === 'members') return viewMembers();
+    if (S.screen === 'reload') return viewReload();
   }
 
   // Ping langsung saat tab dibuka kembali, supaya status online cepat pulih
