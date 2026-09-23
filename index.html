@@ -9,6 +9,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
 <script>
   /* Terapkan tema SEBELUM halaman digambar, supaya tidak ada kedipan terang saat mode gelap aktif.
      Bawaan: terang (juga di halaman login). Pilihan tersimpan di perangkat ini. */
@@ -69,6 +72,7 @@
   /* Nav / kartu / lencana */
   .lc-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 10px; flex-wrap: wrap; }
   .lc-badge { font-size: 12px; padding: 3px 9px; border: 1px solid var(--ink); display: inline-block; white-space: nowrap; }
+  .lc-badge.warn { color: var(--bad); border-color: var(--bad); }
   .lc-card { border: 1.5px solid var(--ink); background: var(--paper); padding: 18px; margin-bottom: 18px; }
   .lc-card h3 { margin-bottom: 4px; }
   .lc-card-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -172,6 +176,11 @@
   /* Review yang masuk ke soal saya */
   .lc-stats { display: flex; gap: 22px; flex-wrap: wrap; margin: 6px 0 0; }
   .lc-stat { min-width: 96px; }
+  .lc-stats.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px 16px; }
+  .lc-stats.grid3 .lc-stat { min-width: 0; }
+  @media (max-width: 480px) {
+    .lc-stats.grid3 { grid-template-columns: repeat(2, 1fr); }
+  }
   .lc-stat b { display: block; font-family: 'DM Serif Display', Georgia, serif; font-weight: 400;
     font-size: 28px; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .lc-stat span { font-size: 13px; color: var(--mute); }
@@ -369,7 +378,7 @@
 
     // daftar "soal saya" & admin
     mineList: [], mineMade: 0, mineMadeThisBatch: 0, mineMax: 0, mineNote: null, adminListData: [], adminSaved: null,
-    adminSearch: '', adminBatchFilter: 'all', adminTypeFilter: 'all', adminNote: null,
+    adminSearch: '', adminBatchFilter: 'all', adminTypeFilter: 'all', adminNote: null, adminOpen: {},
     // review yang masuk ke soal saya
     mineOverall: null, showReviewerNames: false, namesBySetting: false, orphanReviews: 0, mineOpen: {},
     // pengaturan platform (khusus admin)
@@ -423,6 +432,21 @@
       var t = part.trim();
       return t ? '<p>' + esc(t) + '</p>' : '';
     }).join('');
+  }
+  // Render rumus LaTeX ($...$ inline, $$...$$ display) di dalam elemen yang sudah
+  // berisi HTML (dipanggil SETELAH innerHTML di-set). Gagal diam-diam kalau KaTeX
+  // belum termuat (mis. CDN diblokir jaringan) — teks $...$ mentah tetap terbaca.
+  function renderMath(el) {
+    if (!el || typeof window.renderMathInElement !== 'function') return;
+    try {
+      window.renderMathInElement(el, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false }
+        ],
+        throwOnError: false
+      });
+    } catch (e) { /* biarkan tampil sebagai teks biasa kalau gagal */ }
   }
   function saveSession() {
     try { sessionStorage.setItem('lc_token', S.token); sessionStorage.setItem('lc_id', S.id); } catch (e) {}
@@ -1053,19 +1077,38 @@
     var filtered = adminFiltered();
     var filterActive = S.adminBatchFilter !== 'all' || S.adminTypeFilter !== 'all' || !!(S.adminSearch || '').trim();
 
+    // Statistik overall mengikuti hasil pencarian/filter yang sedang aktif.
+    var stats = adminOverallStats(filtered), ov = stats.ov;
+    var overallCard = '<div class="lc-card"><h3>Statistik soal' + (filterActive ? ' (sesuai filter)' : '') + '</h3>' +
+      '<div class="lc-stats grid3">' +
+      statBox(stats.n, 'total soal') +
+      statBox(stats.n ? fmt(stats.avgEst) : '–', 'rata-rata estimasi') +
+      statBox(ov.count, 'total review') +
+      statBox(ov.count ? ov.avgTotal : '–', 'rata-rata skor review') +
+      statBox(ov.count ? fmt(ov.avgActual) : '–', 'rata-rata waktu') +
+      statBox(ov.count ? (ov.correctCount + '/' + ov.count) : '–', 'jawaban benar') +
+      statBox(stats.n ? stats.notReviewed : '–', 'belum direview') +
+      statBox(stats.n ? stats.avgPerQ.toFixed(1) : '–', 'rata-rata review/soal') +
+      statBox(ov.count ? Math.round(ov.correctCount / ov.count * 100) + '%' : '–', 'persentase benar') +
+      '</div>' +
+      '<p class="lc-mute" style="margin:14px 0 0">' +
+      (filterActive ? 'Mengikuti soal yang cocok dengan pencarian dan filter di bawah.' : 'Dari semua soal yang ada.') +
+      ' Total soal, rata-rata estimasi, dan belum direview dihitung dari soal itu sendiri; sisanya dari review yang masuk ke soal-soal tersebut.</p></div>';
+
     var rows = filtered.map(function (q) {
       var hasProg = !!S.prog[q.qid];
-      return '<div class="lc-list-item"><div class="lc-meta">' +
+      return '<div class="lc-list-item lc-mine-item"><div class="lc-head"><div class="lc-meta">' +
         '<p><strong>' + esc(q.qid) + '</strong> <span class="lc-badge">' + esc(typeLabel(q.type)) + '</span> — dibuat oleh ' + esc(q.creator) + ' • ' + esc(batchName(q.batch)) +
-        (q.assigned === false ? ' <span class="lc-badge">Belum ditugaskan</span>' : '') + '</p>' +
+        (q.assigned === false ? ' <span class="lc-badge warn">Belum ditugaskan</span>' : '') + '</p>' +
         '<p class="lc-mute">' + esc(q.preview) + (q.preview.length >= 90 ? '…' : '') + '</p>' +
-        '<p class="lc-mute">' + q.reviews + ' review dari anggota lain' + (q.mineDone ? ' • sudah kamu nilai' : '') +
+        '<p class="lc-mute">Estimasi: ' + q.est + ' dtk' + (q.mineDone ? ' • sudah kamu nilai' : '') +
         (hasProg ? ' • <span class="lc-badge">Ada progres tersimpan</span>' : '') + '</p>' +
         '</div><div class="lc-list-actions">' +
         '<button class="lc-btn small" data-review="' + esc(q.qid) + '">' + (hasProg ? 'Lanjutkan' : 'Tinjau') + '</button>' +
         '<button class="lc-btn ghost small" data-edit="' + esc(q.qid) + '">Edit</button>' +
         '<button class="lc-btn ghost small danger" data-del="' + esc(q.qid) + '">Hapus</button>' +
-        '</div></div>';
+        '</div></div>' +
+        reviewBlock(q, S.adminOpen, 'atoggle') + '</div>';
     }).join('') || (all.length
       ? '<p class="lc-mute">Tidak ada soal yang cocok dengan pencarian atau filter yang dipilih.</p>'
       : '<p class="lc-mute">Belum ada soal.</p>');
@@ -1082,10 +1125,10 @@
     app.innerHTML = navBar() +
       '<div class="lc-rule"></div><h2>Daftar soal (admin)</h2>' +
       '<div class="lc-row" style="margin:14px 0"><button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
-      '<label class="lc-toggle" style="margin:14px 0"><input type="checkbox" id="lc-participate"' + (S.adminParticipate ? ' checked' : '') + '> Ikut menilai saat meninjau</label>' +
       (note ? (note.kind === 'err'
         ? '<p class="lc-err" role="alert">' + esc(note.text) + '</p>'
         : '<div class="lc-notice" role="status"><p>' + esc(note.text) + '</p></div>') : '') +
+      overallCard +
       '<div class="lc-search"><label class="lc-label" for="lc-adm-search">Cari soal</label>' +
       '<input class="lc-input" id="lc-adm-search" type="search" placeholder="Cari berdasarkan ID soal, pembuat, atau isi soal…" value="' + esc(S.adminSearch) + '" autocomplete="off">' +
       '<div class="lc-filterrow">' +
@@ -1095,6 +1138,7 @@
       '<div class="lc-row" style="margin-top:8px"><span class="lc-mute" role="status">' + filtered.length + ' dari ' + all.length + ' soal ditampilkan.</span>' +
       (filterActive ? '<button type="button" class="lc-btn ghost small" id="lc-adm-reset">Reset pencarian dan filter</button>' : '') +
       '</div></div>' +
+      '<label class="lc-toggle" style="margin:14px 0"><input type="checkbox" id="lc-participate"' + (S.adminParticipate ? ' checked' : '') + '> Ikut menilai saat meninjau</label>' +
       '<div>' + rows + '</div>' +
       (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
     bindNav();
@@ -1112,6 +1156,13 @@
     });
     app.querySelectorAll('[data-del]').forEach(function (b) {
       b.onclick = function () { deleteAdminQuestion(b.getAttribute('data-del')); };
+    });
+    app.querySelectorAll('[data-atoggle]').forEach(function (b) {
+      b.onclick = function () {
+        var qid = b.getAttribute('data-atoggle');
+        S.adminOpen[qid] = !S.adminOpen[qid];
+        viewAdminList();
+      };
     });
 
     if (aid) {
@@ -1261,6 +1312,7 @@
       '<div class="lc-row lc-pause" style="margin-top:14px"><button class="lc-btn ghost small" id="lc-exit">Keluar, lanjutkan nanti</button>' +
       '<span class="lc-mute">Stopwatch berhenti dan dilanjutkan dari waktu sekarang saat kamu kembali. Progres disimpan di browser ini.</span></div>';
 
+    renderMath(app);
     var btn = app.querySelector('#lc-done');
     S.started = false; S.stopped = false; btn.disabled = true;
     app.querySelector('#lc-exit').onclick = pauseQuestion;
@@ -1343,6 +1395,7 @@
         '<div class="lc-actions lc-row">' +
         (nxtPeek ? '<button class="lc-btn" id="lc-next-q">Tinjau soal berikutnya (' + esc(nxtPeek) + ')</button>' : '') +
         '<button class="lc-btn ghost" id="lc-next">Kembali ke daftar soal</button></div>';
+      renderMath(app);
       loadImgs(q);
       app.querySelector('#lc-next').onclick = function () { dropProg(q.qid); openAdminList(); };
       var nq = app.querySelector('#lc-next-q');
@@ -1376,6 +1429,7 @@
       '<span class="lc-mute">Nilai dan catatan yang sudah kamu isi tetap tersimpan di browser ini.</span></div>' +
       (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
 
+    renderMath(app);
     loadImgs(q);
     var send = app.querySelector('#lc-send');
     function refresh() {
@@ -1779,19 +1833,46 @@
       (r.note ? '<p class="lc-rv-note">“' + esc(r.note) + '”</p>' : '') +
       '</div>';
   }
-  // Blok review untuk satu soal: ringkasan + daftar yang bisa dibuka/tutup
-  function reviewBlock(q) {
+  // Blok review untuk satu soal: ringkasan + daftar yang bisa dibuka/tutup.
+  // openMap = objek toggle state (S.mineOpen / S.adminOpen), attr = nama data-attribute tombolnya.
+  function reviewBlock(q, openMap, attr) {
     var st = q.stats || { count: 0 };
     if (!st.count) return '<p class="lc-rv-empty">Belum ada yang mereview soal ini.</p>';
-    var open = !!S.mineOpen[q.qid];
+    var open = !!openMap[q.qid];
     return '<div class="lc-stats" style="margin-top:10px">' +
       statBox(st.count, 'review masuk') +
       statBox(st.avgTotal, 'rata-rata skor') +
       statBox(fmt(st.avgActual), 'rata-rata waktu') +
       '</div>' +
-      '<button class="lc-btn ghost small" style="margin-top:10px" data-toggle="' + esc(q.qid) + '">' +
+      '<button class="lc-btn ghost small" style="margin-top:10px" data-' + attr + '="' + esc(q.qid) + '">' +
       (open ? 'Sembunyikan ' + st.count + ' review' : 'Lihat ' + st.count + ' review') + '</button>' +
       (open ? q.reviews.map(reviewItem).join('') : '');
+  }
+
+  // Statistik gabungan sekumpulan review (dipakai kartu "Statistik" di Daftar soal admin).
+  function reviewStatsFlat(list) {
+    if (!list.length) return { count: 0, avgTotal: null, avgActual: null, correctCount: 0 };
+    var sum = function (f) { return list.reduce(function (a, x) { return a + f(x); }, 0); };
+    return {
+      count: list.length,
+      avgTotal: Math.round(sum(function (x) { return x.total; }) / list.length),
+      avgActual: Math.round(sum(function (x) { return x.actual; }) / list.length),
+      correctCount: list.filter(function (x) { return x.correct; }).length
+    };
+  }
+  // Statistik overall untuk sekumpulan soal (mengikuti hasil pencarian/filter yang sedang aktif).
+  function adminOverallStats(list) {
+    var totalEst = 0, flat = [], notReviewed = 0;
+    list.forEach(function (q) {
+      totalEst += Number(q.est) || 0;
+      if (!q.stats || !q.stats.count) notReviewed++;
+      (q.reviews || []).forEach(function (r) { flat.push(r); });
+    });
+    var ov = reviewStatsFlat(flat);
+    return {
+      n: list.length, avgEst: list.length ? Math.round(totalEst / list.length) : 0, ov: ov,
+      notReviewed: notReviewed, avgPerQ: list.length ? (ov.count / list.length) : 0
+    };
   }
 
   // Hapus soal milik sendiri (aturan boleh/tidaknya mengikuti EDITSOAL, dicek ulang oleh server).
@@ -1829,7 +1910,7 @@
     var rows = S.mineList.map(function (q) {
       var canEdit = q.editable;
       var typeBadge = '<span class="lc-badge">' + esc(typeLabel(q.type)) + '</span>';
-      var assignBadge = (S.role === 'admin' && q.assigned === false) ? ' <span class="lc-badge">Belum ditugaskan</span>' : '';
+      var assignBadge = (S.role === 'admin' && q.assigned === false) ? ' <span class="lc-badge warn">Belum ditugaskan</span>' : '';
       var keyInfo = q.type === 'pg'
         ? 'Kunci: ' + esc(q.answer)
         : 'Jawaban diterima: ' + esc((q.answers || []).join(', ')) + (q.caseSensitive ? ' (case sensitive)' : ' (tidak case sensitive)');
@@ -1842,7 +1923,7 @@
         '<button class="lc-btn small" data-qid="' + esc(q.qid) + '"' + (canEdit ? '' : ' disabled') + '>Edit</button>' +
         '<button class="lc-btn ghost small danger" data-delqid="' + esc(q.qid) + '"' + (q.deletable ? '' : ' disabled') + '>Hapus</button>' +
         '</div></div>' +
-        reviewBlock(q) + '</div>';
+        reviewBlock(q, S.mineOpen, 'toggle') + '</div>';
     }).join('') || '<p class="lc-mute">Kamu belum membuat soal.</p>';
 
     // Ringkasan semua review yang masuk ke seluruh soal saya
@@ -1863,9 +1944,10 @@
       overallCard = '<div class="lc-card"><h3>Review yang masuk ke soalmu</h3>' +
         '<div class="lc-stats">' +
         statBox(ov.count, 'total review') +
-        statBox(ov.avgTotal, 'rata-rata skor') +
+        statBox(ov.avgTotal, 'rata-rata skor review') +
         statBox(fmt(ov.avgActual), 'rata-rata waktu') +
         statBox(ov.correctCount + '/' + ov.count, 'jawaban benar') +
+        statBox(Math.round(ov.correctCount / ov.count * 100) + '%', 'persentase benar') +
         '</div>' +
         '<p class="lc-mute" style="margin:14px 0 0">Rata-rata dari semua penilaian pada semua soalmu. ' +
         nameNote + '</p>' + orphanNote + '</div>';
@@ -2026,8 +2108,9 @@
       '<p class="lc-mute lc-hintline" id="lc-imghint"></p></div>' +
       '<div class="lc-fieldset">' +
       '<label class="lc-label" for="lc-soal">Soal</label>' +
-      '<textarea class="lc-textarea" id="lc-soal" maxlength="3000" placeholder="Tulis soal di sini. Bungkus kode Pascal dengan ``` di awal dan akhir agar tampil sebagai blok kode.">' + esc(S.formSoal) + '</textarea>' +
-      '<p class="lc-mute lc-hintline">5–3000 karakter.</p></div>' +
+      '<textarea class="lc-textarea" id="lc-soal" maxlength="3000" placeholder="Tulis soal di sini. Bungkus kode Pascal dengan ``` untuk blok kode, dan rumus dengan $ (inline) atau $$ (blok) untuk LaTeX.">' + esc(S.formSoal) + '</textarea>' +
+      '<p class="lc-mute lc-hintline">5–3000 karakter. Contoh rumus: <code>$a^2 + b^2 = c^2$</code>.</p>' +
+      '<div class="lc-q" id="lc-soal-preview" style="margin-top:10px"></div></div>' +
       typeFields +
       '<div class="lc-fieldset"><label class="lc-label" for="lc-est">Estimasi waktu pengerjaan (detik)</label>' +
       '<input class="lc-input" id="lc-est" type="number" min="' + CONFIG.MIN_EST + '" max="' + CONFIG.MAX_EST + '" value="' + esc(S.formEst) + '">' +
@@ -2044,7 +2127,14 @@
       });
     });
 
-    app.querySelector('#lc-soal').oninput = function (e) { S.formSoal = e.target.value; };
+    function paintSoalPreview() {
+      var pv = app.querySelector('#lc-soal-preview');
+      if (!pv) return;
+      pv.innerHTML = S.formSoal.trim() ? rich(S.formSoal) : '<p class="lc-mute">Pratinjau soal akan muncul di sini.</p>';
+      renderMath(pv);
+    }
+    app.querySelector('#lc-soal').oninput = function (e) { S.formSoal = e.target.value; paintSoalPreview(); };
+    paintSoalPreview();
     if (S.formType === 'pg') {
       KEYS.forEach(function (k) { app.querySelector('#lc-opt-' + k).oninput = function (e) { S.formOpts[k] = e.target.value; }; });
       app.querySelectorAll('input[name="lc-answer"]').forEach(function (r) { r.onchange = function () { S.formAnswer = r.value; }; });
