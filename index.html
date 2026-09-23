@@ -347,10 +347,10 @@
   };
 
   var RUBRIC = [
-    { k: 'c',  name: 'Correctness', sub: 'Kebenaran', desc: 'Keakuratan logika, dan sampel penelusuran kode (code tracing Pascal).' },
+    { k: 'c',  name: 'Correctness', sub: 'Kebenaran', desc: 'Keakuratan logika dan kesesuaian jawaban.' },
     { k: 'cl', name: 'Clarity',     sub: 'Kejelasan', desc: 'Bahasa tidak ambigu, instruksi jelas, dan sesuai kaidah tata bahasa.' },
-    { k: 'cx', name: 'Complexity',  sub: 'Bobot kesulitan', desc: 'Kesesuaian tingkat kerumitan logika dengan target babak.' },
-    { k: 'i',  name: 'Information', sub: 'Kelengkapan', desc: 'Semua petunjuk dan informasi soal lengkap.' }
+    { k: 'cx', name: 'Complexity',  sub: 'Bobot kesulitan', desc: 'Kesesuaian tingkat kerumitan dengan target babak.' },
+    { k: 'i',  name: 'Information', sub: 'Kelengkapan', desc: 'Semua petunjuk dan isi informasi soal lengkap.' }
   ];
   var KEYS = ['A', 'B', 'C', 'D', 'E'];
   var TYPE_LABELS = { PG: 'Pilihan ganda saja', ISIAN: 'Isian singkat saja', KEDUANYA: 'Pilihan ganda atau isian singkat' };
@@ -1415,6 +1415,8 @@
     var nextLabel = S.mode === 'reviewer'
       ? (S.qs.length > 1 ? 'Kirim penilaian dan lanjut' : 'Kirim penilaian dan selesai')
       : 'Kirim penilaian';
+    // Admin: qid soal berikutnya di daftar (mengikuti pencarian/filter yang sedang aktif), untuk tombol "Lewati".
+    var skipQid = (S.mode === 'admin') ? nextAdminQid(q.qid) : null;
 
     app.innerHTML =
       '<div class="lc-rule"></div><h2>' + (S.mode === 'admin' ? 'Nilai soal ' + esc(q.qid) : 'Nilai soal ' + (S.batchDone + 1) + ' dari ' + S.batchTotal) + '</h2>' +
@@ -1424,6 +1426,7 @@
       '<textarea class="lc-textarea" id="lc-note" maxlength="1000"></textarea></div>' +
       '<div class="lc-total"><strong>Total</strong><span class="lc-val" id="lc-total">–</span></div>' +
       '<div class="lc-actions lc-row"><button class="lc-btn" id="lc-send" disabled>' + nextLabel + '</button>' +
+      (skipQid ? '<button class="lc-btn ghost" id="lc-skip">Lewati ke soal berikutnya (' + esc(skipQid) + ')</button>' : '') +
       '<span class="lc-mute" id="lc-hint">Geser keempat slider untuk mengaktifkan tombol.</span></div>' +
       '<div class="lc-row lc-pause" style="margin-top:14px"><button class="lc-btn ghost small" id="lc-exit">Keluar, lanjutkan nanti</button>' +
       '<span class="lc-mute">Nilai dan catatan yang sudah kamu isi tetap tersimpan di browser ini.</span></div>' +
@@ -1461,6 +1464,11 @@
     refresh();
 
     app.querySelector('#lc-exit').onclick = function () { persist(); exitBack(); };
+    var skipBtn = app.querySelector('#lc-skip');
+    if (skipBtn) skipBtn.onclick = function () {
+      dropProg(q.qid);
+      openAdminQuestion(skipQid, true);
+    };
 
     send.onclick = function () {
       S.busy = true; send.disabled = true; send.textContent = 'Menyimpan…';
