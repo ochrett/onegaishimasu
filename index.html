@@ -112,8 +112,28 @@
     font: 14px/1.5 ui-monospace, Menlo, Consolas, monospace; overflow-x: auto; white-space: pre; }
   .lc-opt { display: block; position: relative; margin-bottom: 10px; cursor: pointer; }
   .lc-opt input { position: absolute; opacity: 0; }
-  .lc-opt span { display: flex; gap: 14px; padding: 12px 14px; border: 1.5px solid var(--line); background: var(--paper); overflow-wrap: anywhere; white-space: pre-wrap; }
+  .lc-opt > span { display: flex; gap: 14px; padding: 12px 14px; border: 1.5px solid var(--line); background: var(--paper); overflow-wrap: anywhere; white-space: pre-wrap; }
   .lc-opt b { min-width: 1.4em; }
+  .lc-root [hidden] { display: none !important; }
+
+  /* Isi pilihan jawaban (bisa berisi kode / LaTeX / gambar) */
+  .lc-optbody { flex: 1 1 auto; min-width: 0; }
+  .lc-optbody > :last-child { margin-bottom: 0; }
+  .lc-optbody .lc-code { margin-top: 2px; }
+  .lc-opt input:checked + span .lc-code { background: rgba(128,128,128,.28); color: inherit; border-left-color: currentColor; }
+  .lc-opt-static { display: flex; gap: 10px; align-items: flex-start; }
+  .lc-opt-static b { min-width: 1.4em; }
+  .lc-optbody .lc-fig { margin: 8px 0 0; }
+  .lc-optbody .lc-fig .lc-mute { display: none; }
+  .lc-optbody .lc-img { max-height: 240px; width: auto; max-width: 100%; }
+
+  /* Form buat soal: pilihan jawaban + pratinjau */
+  .lc-optfield { margin-bottom: 12px; }
+  .lc-textarea.lc-opt-ta { min-height: 50px; }
+  .lc-q.lc-opt-preview { margin: 8px 0 0; padding: 12px 14px; }
+  .lc-q.lc-opt-preview > :last-child { margin-bottom: 0; }
+  .lc-opt-preview .lc-img { max-height: 200px; width: auto; max-width: 100%; }
+  .lc-optimg-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
   .lc-opt input:checked + span { border-color: var(--ink); background: var(--ink); color: var(--paper); }
   .lc-opt input:disabled + span { opacity: .4; cursor: not-allowed; }
 
@@ -257,9 +277,9 @@
   .lc-btn, .lc-opt, .lc-range { touch-action: manipulation; }
   .lc-btn { min-height: 48px; }
   .lc-btn.small { min-height: 40px; }
-  .lc-opt span { min-height: 52px; align-items: center; padding: 14px; }
+  .lc-opt > span { min-height: 52px; align-items: center; padding: 14px; }
   .lc-stick { position: sticky; top: 0; z-index: 6; background: var(--bg); padding-top: 8px; }
-  .lc-actions { margin-top: 20px; }
+  .lc-actions { margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; }
 
   .lc-range { -webkit-appearance: none; appearance: none; height: 44px; background: transparent; touch-action: pan-y; }
   .lc-range::-webkit-slider-runnable-track { height: 8px; background: var(--line); }
@@ -343,7 +363,9 @@
     MIN_EST: 10,
     MAX_EST: 3600,
     RUBRIC_MIN: 0,
-    RUBRIC_MAX: 100
+    RUBRIC_MAX: 100,
+    MEMBER_OPT_IMAGES: true,
+    MEMBER_FORMATTING: true
   };
 
   var RUBRIC = [
@@ -395,7 +417,7 @@
     editingQid: null, formOrigin: 'mine', formCreator: '', formBatch: 0,
     formType: 'pg', formSoal: '', formOpts: { A: '', B: '', C: '', D: '', E: '' }, formAnswer: '',
     formAnswers: '', formCaseSensitive: false, formAssigned: false,
-    formEst: '', formImagesKeep: [], formImagesNew: [], formBusy: false, formErr: ''
+    formEst: '', formImagesKeep: [], formImagesNew: [], formOptImgKeep: {}, formOptImgNew: {}, formBusy: false, formErr: ''
   };
 
   try {
@@ -447,6 +469,25 @@
         throwOnError: false
       });
     } catch (e) { /* biarkan tampil sebagai teks biasa kalau gagal */ }
+  }
+  // Apakah teks memakai formatting khusus (blok kode ``` atau LaTeX $...$ / $$...$$).
+  function hasFormat(text) {
+    var t = String(text || '');
+    return t.indexOf('```') >= 0 || /\$\$[\s\S]+?\$\$/.test(t) || /\$[^$\n]+\$/.test(t);
+  }
+  // Id file gambar pilihan sebuah soal, dan gabungan semua gambar soal (soal + pilihan)
+  function optImgIds(q) {
+    var o = q.optImages || {};
+    return KEYS.filter(function (k) { return o[k]; }).map(function (k) { return o[k]; });
+  }
+  function allImgIds(q) { return (q.images || []).concat(optImgIds(q)); }
+  function canOptImg() { return S.role === 'admin' || CONFIG.MEMBER_OPT_IMAGES; }
+  function canFormat() { return S.role === 'admin' || CONFIG.MEMBER_FORMATTING; }
+  // Isi satu pilihan jawaban: teks (dengan formatting kalau ada) + gambar pilihan (opsional).
+  function optBody(text, fid) {
+    var t = String(text || '');
+    var fig = fid ? '<figure class="lc-fig" data-fid="' + esc(fid) + '">' + figInner(fid) + '</figure>' : '';
+    return '<div class="lc-optbody">' + (hasFormat(t) ? rich(t) : esc(t)) + fig + '</div>';
   }
   function saveSession() {
     try { sessionStorage.setItem('lc_token', S.token); sessionStorage.setItem('lc_id', S.id); } catch (e) {}
@@ -675,12 +716,12 @@
     if (!fig) return;
     fig.innerHTML = figInner(f);
     var im = fig.querySelector('img[data-zoom]');
-    if (im) im.onclick = function () { zoomImg(S.img[f]); };
+    if (im) im.onclick = function (e) { e.preventDefault(); e.stopPropagation(); zoomImg(S.img[f]); };
     var retry = fig.querySelector('[data-retry]');
     if (retry) retry.onclick = function () { delete S.img[f]; fig.innerHTML = figInner(f); fetchImg(f).then(function () { fillFig(f); }); };
   }
   function loadImgs(q) {
-    return Promise.all((q.images || []).map(function (f) {
+    return Promise.all(allImgIds(q).map(function (f) {
       return fetchImg(f).then(function () { fillFig(f); });
     }));
   }
@@ -805,6 +846,8 @@
         CONFIG.MAX_IMAGES = cfg.maxImages; CONFIG.TIME_TOLERANCE = cfg.timeTolerance;
         if (cfg.rubricMin != null) CONFIG.RUBRIC_MIN = cfg.rubricMin;
         if (cfg.rubricMax != null) CONFIG.RUBRIC_MAX = cfg.rubricMax;
+        if (cfg.memberOptImages != null) CONFIG.MEMBER_OPT_IMAGES = !!cfg.memberOptImages;
+        if (cfg.memberFormatting != null) CONFIG.MEMBER_FORMATTING = !!cfg.memberFormatting;
       }
       return res;
     }).then(function (res) {
@@ -1259,7 +1302,10 @@
       '<div class="lc-row" style="margin-top:14px"><button class="lc-btn" id="lc-begin">' + (resume ? 'Lanjutkan mengerjakan' : 'Mulai mengerjakan') + '</button>' +
       '<button class="lc-btn ghost" id="lc-back">' + (isAdmin ? 'Kembali ke daftar soal' : 'Kembali ke menu') + '</button></div></div>';
 
-    app.querySelector('#lc-begin').onclick = function () { S.screen = 'question'; render(); };
+    app.querySelector('#lc-begin').onclick = function () {
+  api('begin', { qid: S.qs[0].qid }).catch(function () {}); // fire-and-forget, server no-op utk admin
+  S.screen = 'question'; render();
+};
     app.querySelector('#lc-back').onclick = exitBack;
   }
 
@@ -1275,11 +1321,13 @@
 
   function viewQuestion() {
     var q = S.qs[0];
+    // Admin: qid soal berikutnya di daftar (mengikuti pencarian/filter yang sedang aktif), untuk tombol "Lewati".
+    var skipQid = (S.mode === 'admin') ? nextAdminQid(q.qid) : null;
     var answerHtml;
     if (q.type === 'pg') {
       answerHtml = '<div role="radiogroup" aria-label="Pilihan jawaban">' + q.options.map(function (o) {
         return '<label class="lc-opt"><input type="radio" name="lc-choice" value="' + esc(o.key) + '"' +
-          (S.choice === o.key ? ' checked' : '') + '><span><b>' + esc(o.key) + '.</b><em style="font-style:normal">' + esc(o.text) + '</em></span></label>';
+          (S.choice === o.key ? ' checked' : '') + '><span><b>' + esc(o.key) + '.</b>' + optBody(o.text, (q.optImages || {})[o.key]) + '</span></label>';
       }).join('') + '</div>';
     } else {
       answerHtml = '<label class="lc-label" for="lc-textans">Jawabanmu</label>' +
@@ -1308,7 +1356,9 @@
       (S.mode === 'reviewer' ? '<div class="lc-bar"><i style="width:' + Math.round((S.batchDone / S.batchTotal) * 100) + '%"></i></div>' : '<div class="lc-bar"><i style="width:0%"></i></div>') + '</div>' +
       '<div class="lc-q">' + imgHtml(q) + rich(q.soal) + '</div>' +
       answerHtml +
-      '<div class="lc-actions"><button class="lc-btn" id="lc-done" disabled>Selesai mengerjakan</button><p class="lc-err" id="lc-qerr" role="alert" style="margin:8px 0 0"></p></div>' +
+      '<div class="lc-actions"><button class="lc-btn" id="lc-done" disabled>Selesai mengerjakan</button>' +
+      (skipQid ? '<button class="lc-btn ghost" id="lc-skip">Lewati ke soal berikutnya (' + esc(skipQid) + ')</button>' : '') +
+      '<p class="lc-err" id="lc-qerr" role="alert" style="margin:8px 0 0"></p></div>' +
       '<div class="lc-row lc-pause" style="margin-top:14px"><button class="lc-btn ghost small" id="lc-exit">Keluar, lanjutkan nanti</button>' +
       '<span class="lc-mute">Stopwatch berhenti dan dilanjutkan dari waktu sekarang saat kamu kembali. Progres disimpan di browser ini.</span></div>';
 
@@ -1316,6 +1366,12 @@
     var btn = app.querySelector('#lc-done');
     S.started = false; S.stopped = false; btn.disabled = true;
     app.querySelector('#lc-exit').onclick = pauseQuestion;
+    var skipBtn = app.querySelector('#lc-skip');
+    if (skipBtn) skipBtn.onclick = function () {
+      stopTimer();
+      dropProg(q.qid);
+      openAdminQuestion(skipQid, true);
+    };
     if (q.type === 'pg') {
       app.querySelectorAll('input[name="lc-choice"]').forEach(function (r) {
         r.onchange = function () { S.choice = r.value; btn.disabled = !S.started; };
@@ -1357,7 +1413,7 @@
       S.t0 = Date.now(); S.started = true; btn.disabled = !answerReady(q);
       stopTimer();
       S.timer = setInterval(function () { sw.textContent = fmt(S.base + (Date.now() - S.t0) / 1000); }, 250);
-      if (S.qs[1]) (S.qs[1].images || []).forEach(fetchImg); // siapkan gambar soal berikutnya
+      if (S.qs[1]) allImgIds(S.qs[1]).forEach(fetchImg); // siapkan gambar soal berikutnya
     });
   }
 
@@ -1368,8 +1424,8 @@
     var keyBlock;
     if (q.type === 'pg') {
       var keyOpts = q.options.map(function (o) {
-        return '<div class="lc-opt-static' + (o.key === S.key ? ' key' : '') + '"><b>' + esc(o.key) + '.</b> ' + esc(o.text) +
-          (o.key === S.key ? ' (kunci)' : '') + '</div>';
+        return '<div class="lc-opt-static' + (o.key === S.key ? ' key' : '') + '"><b>' + esc(o.key) + '.</b>' + optBody(o.text, (q.optImages || {})[o.key]) +
+          (o.key === S.key ? '<span class="lc-mute" style="white-space:nowrap">(kunci)</span>' : '') + '</div>';
       }).join('');
       keyBlock = '<details class="lc-details"><summary>Lihat soal dan kunci</summary><div class="lc-q" style="margin-top:8px">' + imgHtml(q) + rich(q.soal) + keyOpts + '</div></details>';
     } else {
@@ -1481,7 +1537,7 @@
         dropProg(q.qid);
         if (S.mode === 'reviewer') {
           S.qs.shift(); S.batchDone += 1; S.choice = null;
-          if (S.qs.length) enterQuestion(true); // langsung ke soal berikutnya, tanpa konfirmasi lagi
+          if (S.qs.length) { api('begin', { qid: S.qs[0].qid }).catch(function () {}); enterQuestion(true); }
           else {
             // Status "ada soal baru?" sudah dihitung server di respons submit,
             // jadi halaman Selesai langsung tampil benar tanpa berkedip.
@@ -1704,6 +1760,8 @@
       else if (s.key === 'TIPESOAL') S.allowedTypes = s.value;
       else if (s.key === 'MAKSSOALPERBATCH') S.maxQuestionsPerBatch = s.value;
       else if (s.key === 'ANGGOTA_LIHAT_ANGGOTA') S.membersOpen = S.role === 'admin' || !!s.value;
+      else if (s.key === 'ANGGOTA_GAMBAR_PILIHAN') CONFIG.MEMBER_OPT_IMAGES = !!s.value;
+      else if (s.key === 'ANGGOTA_FORMAT_KHUSUS') CONFIG.MEMBER_FORMATTING = !!s.value;
     });
   }
   function takeSettings(res) {
@@ -2020,10 +2078,13 @@
     }
     S.formEst = String(q.est);
     S.formImagesKeep = (q.images || []).slice();
+    S.formOptImgKeep = Object.assign({}, q.optImages || {});
+    S.formOptImgNew = {};
   }
 
   function openCreateForm(qid) {
     S.formErr = ''; S.formImagesNew = [];
+    S.formOptImgKeep = {}; S.formOptImgNew = {};
     S.formOrigin = 'mine'; S.formCreator = ''; S.formBatch = 0;
     if (qid) {
       var q = S.mineList.find(function (x) { return x.qid === qid; });
@@ -2063,6 +2124,11 @@
         esc(S.formCreator || '–') + '</strong> untuk ' + esc(batchName(S.formBatch)) + '.</p></div>'
       : '';
 
+      if (!canFormat()) {
+      originNote += '<div class="lc-notice" style="margin-top:14px"><p>Admin menonaktifkan formatting khusus. ' +
+        'Blok kode (```) dan rumus LaTeX ($...$) tidak bisa dipakai di soal maupun pilihan.</p></div>';
+    }
+
     // Khusus admin: apakah soal ini ditugaskan ke anggota untuk direview.
     // Soal baru (create) default OFF; anggota tidak melihat kontrol ini sama sekali.
     var assignToggle = S.role === 'admin'
@@ -2078,10 +2144,28 @@
 
     var typeFields;
     if (S.formType === 'pg') {
+      var optImgOn = canOptImg();
       var optsHtml = KEYS.map(function (k) {
-        return '<label class="lc-label" for="lc-opt-' + k + '">Pilihan ' + k + '</label>' +
-          '<input class="lc-input" id="lc-opt-' + k + '" maxlength="500" value="' + esc(S.formOpts[k]) + '" style="margin-bottom:12px">';
-      }).join('');
+        var imgRow = '';
+        if (optImgOn) {
+          var hasImg = !!(S.formOptImgKeep[k] || S.formOptImgNew[k]);
+          var thumb = '';
+          if (S.formOptImgNew[k]) thumb = '<img src="' + S.formOptImgNew[k].preview + '" alt="Gambar pilihan ' + k + '">';
+          else if (S.formOptImgKeep[k]) thumb = '<img id="optthumb-' + k + '" alt="Gambar pilihan ' + k + '">';
+          imgRow = '<div class="lc-optimg-row">' +
+            (hasImg ? '<div class="lc-thumb">' + thumb + '<button type="button" data-remove-opt="' + k + '" aria-label="Hapus gambar pilihan ' + k + '">×</button></div>' : '') +
+            '<label class="lc-btn ghost small lc-filebtn">' + (hasImg ? 'Ganti gambar' : '+ Gambar') +
+            '<input type="file" accept="image/*" data-optpick="' + k + '"></label></div>';
+        }
+        return '<div class="lc-optfield"><label class="lc-label" for="lc-opt-' + k + '">Pilihan ' + k + '</label>' +
+          '<textarea class="lc-textarea lc-opt-ta" id="lc-opt-' + k + '" rows="1" maxlength="500">' + esc(S.formOpts[k]) + '</textarea>' +
+          imgRow +
+          '<div class="lc-q lc-opt-preview" id="lc-optpv-' + k + '" hidden></div></div>';
+      }).join('') +
+        '<p class="lc-mute lc-hintline" id="lc-optimghint">' +
+        (canFormat() ? 'Pilihan mendukung blok kode (```) dan rumus ($...$). ' : '') +
+        (optImgOn ? 'Tiap pilihan boleh 1 gambar. ' : '') +
+        'Pratinjau muncul otomatis kalau ada formatting atau gambar.</p>';
       var answerHtml = '<div role="radiogroup" aria-label="Kunci jawaban">' + KEYS.map(function (k) {
         return '<label class="lc-opt"><input type="radio" name="lc-answer" value="' + k + '"' + (S.formAnswer === k ? ' checked' : '') + '>' +
           '<span><b>' + k + '</b></span></label>';
@@ -2118,7 +2202,7 @@
       '<label class="lc-label" for="lc-soal">Soal</label>' +
       '<textarea class="lc-textarea" id="lc-soal" maxlength="3000" placeholder="Tulis soal di sini. Bungkus kode Pascal dengan ``` untuk blok kode, dan rumus dengan $ (inline) atau $$ (blok) untuk LaTeX.">' + esc(S.formSoal) + '</textarea>' +
       '<p class="lc-mute lc-hintline">5–3000 karakter. Contoh rumus: <code>$a^2 + b^2 = c^2$</code>.</p>' +
-      '<div class="lc-q" id="lc-soal-preview" style="margin-top:10px"></div></div>' +
+      '<div class="lc-q" id="lc-soal-preview" style="margin-top:10px" hidden></div></div>' +
       typeFields +
       '<div class="lc-fieldset"><label class="lc-label" for="lc-est">Estimasi waktu pengerjaan (detik)</label>' +
       '<input class="lc-input" id="lc-est" type="number" min="' + CONFIG.MIN_EST + '" max="' + CONFIG.MAX_EST + '" value="' + esc(S.formEst) + '">' +
@@ -2132,19 +2216,64 @@
       fetchImg(fid).then(function () {
         var im = app.querySelector('#thumb-' + fid);
         if (im) im.src = (S.img[fid] && S.img[fid] !== 'err') ? S.img[fid] : '';
+        if (S.screen === 'create') paintSoalPreview();
+      });
+    });
+    KEYS.forEach(function (k) {
+      var fid = S.formOptImgKeep[k];
+      if (!fid || S.formOptImgNew[k]) return;
+      fetchImg(fid).then(function () {
+        var im = app.querySelector('#optthumb-' + k);
+        if (im) im.src = (S.img[fid] && S.img[fid] !== 'err') ? S.img[fid] : '';
+        if (S.screen === 'create') paintOptPreview(k);
       });
     });
 
+    function previewImages() {
+      var out = [];
+      S.formImagesKeep.forEach(function (fid) {
+        if (S.img[fid] && S.img[fid] !== 'err') out.push(S.img[fid]);
+      });
+      S.formImagesNew.forEach(function (im) { out.push(im.preview); });
+      return out;
+    }
+    function optPreviewSrc(k) {
+      if (S.formOptImgNew[k]) return S.formOptImgNew[k].preview;
+      var fid = S.formOptImgKeep[k];
+      return (fid && S.img[fid] && S.img[fid] !== 'err') ? S.img[fid] : '';
+    }
     function paintSoalPreview() {
       var pv = app.querySelector('#lc-soal-preview');
       if (!pv) return;
-      pv.innerHTML = S.formSoal.trim() ? rich(S.formSoal) : '<p class="lc-mute">Pratinjau soal akan muncul di sini.</p>';
+      var imgs = previewImages();
+      var show = (canFormat() && hasFormat(S.formSoal)) || imgs.length > 0;
+      pv.hidden = !show;
+      if (!show) { pv.innerHTML = ''; return; }
+      pv.innerHTML =
+        (imgs.length ? '<div class="lc-imgs">' + imgs.map(function (src) {
+          return '<figure class="lc-fig"><img class="lc-img" style="cursor:default" alt="Gambar pada soal" src="' + src + '"></figure>';
+        }).join('') + '</div>' : '') +
+        rich(S.formSoal);
+      renderMath(pv);
+    }
+    function paintOptPreview(k) {
+      var pv = app.querySelector('#lc-optpv-' + k);
+      if (!pv) return;
+      var t = S.formOpts[k], src = optPreviewSrc(k);
+      var show = (canFormat() && hasFormat(t)) || !!src;
+      pv.hidden = !show;
+      if (!show) { pv.innerHTML = ''; return; }
+      pv.innerHTML = rich(t) +
+        (src ? '<figure class="lc-fig"><img class="lc-img" style="cursor:default" alt="Gambar pilihan ' + k + '" src="' + src + '"></figure>' : '');
       renderMath(pv);
     }
     app.querySelector('#lc-soal').oninput = function (e) { S.formSoal = e.target.value; paintSoalPreview(); };
     paintSoalPreview();
     if (S.formType === 'pg') {
-      KEYS.forEach(function (k) { app.querySelector('#lc-opt-' + k).oninput = function (e) { S.formOpts[k] = e.target.value; }; });
+      KEYS.forEach(function (k) {
+        app.querySelector('#lc-opt-' + k).oninput = function (e) { S.formOpts[k] = e.target.value; paintOptPreview(k); };
+        paintOptPreview(k);
+      });
       app.querySelectorAll('input[name="lc-answer"]').forEach(function (r) { r.onchange = function () { S.formAnswer = r.value; }; });
     } else {
       app.querySelector('#lc-answers').oninput = function (e) { S.formAnswers = e.target.value; };
@@ -2193,6 +2322,25 @@
         viewCreate();
       }).catch(function (e) { hint.textContent = 'Gagal memproses gambar: ' + e.message; });
     };
+    app.querySelectorAll('[data-optpick]').forEach(function (inp) {
+      inp.onchange = function () {
+        var k = inp.getAttribute('data-optpick'), f = inp.files && inp.files[0];
+        if (!f) return;
+        var hint = app.querySelector('#lc-optimghint');
+        if (hint) hint.textContent = 'Memproses gambar pilihan ' + k + '…';
+        compressImage(f).then(function (im) {
+          S.formOptImgNew[k] = im; delete S.formOptImgKeep[k];
+          viewCreate();
+        }).catch(function (e) { if (hint) hint.textContent = 'Gagal memproses gambar pilihan ' + k + ': ' + e.message; });
+      };
+    });
+    app.querySelectorAll('[data-remove-opt]').forEach(function (b) {
+      b.onclick = function () {
+        var k = b.getAttribute('data-remove-opt');
+        delete S.formOptImgNew[k]; delete S.formOptImgKeep[k];
+        viewCreate();
+      };
+    });
 
     // Kirim ke server (dipanggil setelah pembuat soal menekan konfirmasi)
     function doSave(soal, est) {
@@ -2205,6 +2353,12 @@
       };
       if (S.formType === 'pg') {
         payload.type = 'pg'; payload.options = S.formOpts; payload.answer = S.formAnswer;
+        payload.optImages = {};
+        KEYS.forEach(function (k) {
+          var im = S.formOptImgNew[k];
+          if (im) payload.optImages[k] = { mime: im.mime, data: im.data };
+        });
+        if (isEdit) payload.optKeep = S.formOptImgKeep;
       } else {
         payload.type = 'isian';
         payload.answers = S.formAnswers.split(/\r?\n/);
@@ -2236,6 +2390,10 @@
       if (soal.length < 5 || soal.length > 3000) { S.formErr = 'Isi soal 5 sampai 3000 karakter.'; return viewCreate(); }
       var est = Math.round(Number(S.formEst));
       if (!(est >= CONFIG.MIN_EST && est <= CONFIG.MAX_EST)) { S.formErr = 'Estimasi waktu harus ' + CONFIG.MIN_EST + '–' + CONFIG.MAX_EST + ' detik.'; return viewCreate(); }
+      if (!canFormat() && (hasFormat(S.formSoal) || (S.formType === 'pg' && KEYS.some(function (k) { return hasFormat(S.formOpts[k]); })))) {
+        S.formErr = 'Formatting khusus (blok kode ``` dan LaTeX $...$) sedang dinonaktifkan admin. Hapus formatting tersebut.';
+        return viewCreate();
+      }
 
       var ansList = [];
       if (S.formType === 'pg') {
