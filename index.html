@@ -133,7 +133,10 @@
   .lc-q.lc-opt-preview { margin: 8px 0 0; padding: 12px 14px; }
   .lc-q.lc-opt-preview > :last-child { margin-bottom: 0; }
   .lc-opt-preview .lc-img { max-height: 200px; width: auto; max-width: 100%; }
-  .lc-optimg-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .lc-optimg-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 8px; }
+  .lc-linkbtn { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer;
+    text-decoration: underline; font-weight: 700; touch-action: manipulation; }
+  .lc-linkbtn:focus-visible { outline: 3px solid #2b6df6; outline-offset: 2px; }
   .lc-opt input:checked + span { border-color: var(--ink); background: var(--ink); color: var(--paper); }
   .lc-opt input:disabled + span { opacity: .4; cursor: not-allowed; }
 
@@ -383,7 +386,7 @@
   var app = document.getElementById('lc-app');
   var S = {
     screen: 'login', id: '', token: '', nama: '', role: 'anggota', err: '', flash: '', busy: false,
-    theme: 'light',
+    theme: 'light', trial: false,
 
     // status ringkas
     made: 0, madeThisBatch: 0, maxQuestionsPerBatch: 0, batch: 0, batchMax: 0, hasBatch: false, batchTotal: 0, batchDone: 0, currentBatch: 1,
@@ -976,7 +979,10 @@
           '<button class="lc-btn" disabled>Ambil soal baru</button>' +
           '<p class="lc-mute lc-hintline">Belum ada soal baru yang bisa diambil saat ini.</p>';
       }
-      reviewerCard = '<div class="lc-card"><div class="lc-card-h"><h3>Review soal</h3>' + statusBadge(reviewStatusKind()) + '</div>' + batchInfo + body + '</div>';
+      var trialLink = Number(S.currentBatch) !== 0
+        ? '<p class="lc-mute" style="margin:14px 0 0">Coba simulasi review soal <button type="button" class="lc-linkbtn" id="lc-trial">di sini</button>.</p>'
+        : '';
+      reviewerCard = '<div class="lc-card"><div class="lc-card-h"><h3>Review soal</h3>' + statusBadge(reviewStatusKind()) + '</div>' + batchInfo + body + trialLink + '</div>';
     } else {
       reviewerCard =
         '<div class="lc-card"><h3>Review soal (mode admin)</h3>' + batchInfo +
@@ -1050,6 +1056,7 @@
     var st = app.querySelector('#lc-start'); if (st) st.onclick = function () { startBatch(false); };
     var nb = app.querySelector('#lc-newbatch'); if (nb) nb.onclick = function () { startBatch(true); };
     var mi = app.querySelector('#lc-mine'); if (mi) mi.onclick = openMine;
+    var tl = app.querySelector('#lc-trial'); if (tl) tl.onclick = startTrialSim;
     // Masuk dari menu = mulai bersih (pencarian & filter direset).
     var al = app.querySelector('#lc-adminlist'); if (al) al.onclick = function () { openAdminList(true); };
     var pt = app.querySelector('#lc-participate'); if (pt) pt.onchange = function () { S.adminParticipate = pt.checked; };
@@ -1085,6 +1092,7 @@
     api(forceNew ? 'newbatch' : 'start').then(function (res) {
       if (!res.ok) throw new Error(res.error || 'Gagal memuat.');
       S.mode = 'reviewer';
+      S.trial = !!res.trial;
       S.qs = res.questions; S.batchTotal = res.batchTotal; S.batchDone = res.batchDone;
       S.batch = res.batch; S.choice = null;
       if (!S.qs.length) { S.hasNewBatchAvailable = false; S.screen = 'done'; return render(); }
@@ -1096,6 +1104,24 @@
     }).catch(function (e) {
       if (isHandled(e)) return;
       S.err = e.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server.' : e.message;
+      S.screen = 'menu'; loadStatus();
+    });
+  }
+
+  function isTrialQid(qid) { return /^(PG|IS)-TRIAL\d+$/i.test(String(qid || '')); }
+
+  // Simulasi review soal Batch Trial (hasil tidak disimpan ke Review/Penugasan, hanya audit log)
+  function startTrialSim() {
+    S.err = '';
+    viewLoading('Menyiapkan simulasi review…');
+    api('trial_start').then(function (res) {
+      if (!res.ok) throw new Error(res.error || 'Gagal memuat simulasi.');
+      S.mode = 'reviewer'; S.trial = true;
+      S.qs = res.questions; S.batchTotal = res.batchTotal; S.batchDone = 0; S.batch = 0; S.choice = null;
+      enterQuestion();
+    }).catch(function (e) {
+      if (isHandled(e)) return;
+      S.flash = e.message === 'Failed to fetch' ? 'Tidak bisa terhubung ke server.' : e.message;
       S.screen = 'menu'; loadStatus();
     });
   }
@@ -1127,9 +1153,14 @@
     return out.sort(function (a, c) { return a - c; });
   }
   // Daftar soal setelah pencarian + filter batch + filter jenis. Dipakai juga untuk "soal berikutnya".
+  // Soal Batch Trial hanya ditampilkan kalau filter batch = Batch Trial; selain itu disembunyikan.
+  function adminBase() {
+    var onlyTrial = S.adminBatchFilter === '0';
+    return (S.adminListData || []).filter(function (x) { return (Number(x.batch) === 0) === onlyTrial; });
+  }
   function adminFiltered() {
     var kw = (S.adminSearch || '').trim().toLowerCase();
-    return (S.adminListData || []).filter(function (x) {
+    return adminBase().filter(function (x) {
       if (S.adminBatchFilter !== 'all' && String(x.batch) !== S.adminBatchFilter) return false;
       if (S.adminTypeFilter !== 'all' && x.type !== S.adminTypeFilter) return false;
       if (!kw) return true;
@@ -1143,7 +1174,7 @@
     var ae = document.activeElement, aid = ae && ae.id ? ae.id : '';
     var note = S.adminNote; S.adminNote = null;
 
-    var all = S.adminListData || [];
+    var all = adminBase();
     var batches = adminBatchOptions();
     if (S.adminBatchFilter !== 'all' && batches.indexOf(Number(S.adminBatchFilter)) < 0) S.adminBatchFilter = 'all';
     var filtered = adminFiltered();
@@ -1327,7 +1358,9 @@
       '<div class="lc-card" style="margin-top:18px"><h3>' + (resume ? 'Lanjutkan soal ini?' : 'Siap mengerjakan soal ini?') + '</h3>' +
       '<p>Soal belum ditampilkan. Stopwatch mulai berjalan setelah kamu menekan tombol di bawah, dan berhenti saat kamu menekan Selesai mengerjakan.</p>' +
       (resume ? '<p>Kamu sudah mengerjakan soal ini selama <strong>' + fmt(el) + '</strong>. Stopwatch dilanjutkan dari waktu itu.</p>' : '') +
-      (isAdmin ? '<p class="lc-mute">' + (S.reviewMode === 'rate' ? 'Penilaianmu akan tersimpan ke Review.' : 'Kamu hanya meninjau, tidak ikut menilai.') + '</p>' : '') +
+      (isTrialQid(q.qid)
+        ? '<p class="lc-mute">Soal Batch Trial (simulasi): penilaianmu tidak disimpan ke Review dan hanya tercatat di audit log.</p>'
+        : (isAdmin ? '<p class="lc-mute">' + (S.reviewMode === 'rate' ? 'Penilaianmu akan tersimpan ke Review.' : 'Kamu hanya meninjau, tidak ikut menilai.') + '</p>' : '')) +
       '<div class="lc-row" style="margin-top:14px"><button class="lc-btn" id="lc-begin">' + (resume ? 'Lanjutkan mengerjakan' : 'Mulai mengerjakan') + '</button>' +
       '<button class="lc-btn ghost" id="lc-back">' + (isAdmin ? 'Kembali ke daftar soal' : 'Kembali ke menu') + '</button></div></div>';
 
@@ -1577,7 +1610,7 @@
           }
         } else {
           S.adminSaved = { qid: q.qid, total: res.total };
-          S.adminListData.forEach(function (x) { if (x.qid === q.qid) x.mineDone = true; });
+          if (!isTrialQid(q.qid)) S.adminListData.forEach(function (x) { if (x.qid === q.qid) x.mineDone = true; });
           S.screen = 'adminnext'; render();
         }
       }).catch(function (e) {
@@ -1628,7 +1661,9 @@
       : '';
     app.innerHTML =
       '<div class="lc-rule"></div><h1>Selesai</h1>' +
-      '<p style="margin:16px 0 26px">' + S.batchTotal + ' soal sudah kamu review dan semua nilai tersimpan di Google Sheets. Terima kasih, ' + esc(S.id) + '.</p>' +
+      '<p style="margin:16px 0 26px">' + (S.trial
+        ? 'Simulasi selesai (' + S.batchTotal + ' soal). Terima kasih, ' + esc(S.id) + '.'
+        : S.batchTotal + ' soal sudah kamu review dan semua nilai tersimpan di Google Sheets. Terima kasih, ' + esc(S.id) + '.') + '</p>' +
       '<div class="lc-row">' + newBtn +
       '<button class="lc-btn ghost" id="lc-menu-back">Kembali ke menu</button></div>' +
       (S.err ? '<p class="lc-err" role="alert">' + esc(S.err) + '</p>' : '');
@@ -2189,8 +2224,8 @@
             '<input type="file" accept="image/*" data-optpick="' + k + '"></label></div>';
         }
         return '<div class="lc-optfield"><label class="lc-label" for="lc-opt-' + k + '">Pilihan ' + k + '</label>' +
-          '<textarea class="lc-textarea lc-opt-ta" id="lc-opt-' + k + '" rows="1" maxlength="500">' + esc(S.formOpts[k]) + '</textarea>' +
           imgRow +
+          '<textarea class="lc-textarea lc-opt-ta" id="lc-opt-' + k + '" rows="1" maxlength="500">' + esc(S.formOpts[k]) + '</textarea>' +
           '<div class="lc-q lc-opt-preview" id="lc-optpv-' + k + '" hidden></div></div>';
       }).join('') +
         '<p class="lc-mute lc-hintline" id="lc-optimghint">' +
