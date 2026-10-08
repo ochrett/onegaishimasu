@@ -608,11 +608,27 @@
     return fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify({ action: 'login', id: id, kode: kode }) })
       .then(parseJsonResponse);
   }
-  function api(action, data, _retry) {
+  // Aksi yang aman diulang otomatis. 'check' sengaja tidak masuk (ada throttle 10 dtk di server);
+  // create/update/delete/settings_save juga tidak, supaya tidak menggandakan data.
+  var SAFE_RETRY = { config:1, status:1, start:1, newbatch:1, begin:1, submit:1, image:1, mine:1,
+    members:1, admin_list:1, admin_open:1, admin_question_full:1, settings_get:1, audit_list:1 };
+
+  function api(action, data, _n) {
+    var n = _n || 0;
     var body = Object.assign({ action: action, token: S.token }, data || {});
-    return fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify(body) })
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, SAFE_RETRY[action] ? 30000 : 90000);
+    var t0 = performance.now();
+    function again() {
+      return new Promise(function (r) { setTimeout(r, 900 * Math.pow(2, n)); })
+        .then(function () { return api(action, data, n + 1); });
+    }
+    return fetch(CONFIG.API_URL, { method: 'POST', body: JSON.stringify(body), signal: ctrl.signal })
       .then(parseJsonResponse)
       .then(function (res) {
+        clearTimeout(timer);
+        var ms = Math.round(performance.now() - t0);
+        if (ms > 3000) console.warn('[api lambat]', action, ms + 'ms', 'percobaan', n + 1);
         if (!res.ok && res.code === 'SESSION') {
           clearSession();
           S.screen = 'login'; S.err = res.error || 'Sesi berakhir. Silakan masuk lagi.';
@@ -626,18 +642,13 @@
           loadStatus();
           throw new Error('CLOSED');
         }
-        // Server sedang sibuk (lock tidak didapat) — coba lagi otomatis 1-2 kali
-        // dengan jeda singkat, sebelum menyerah dan meneruskan error ke pemanggil.
-        if (!res.ok && res.code === 'BUSY') {
-          var n = _retry || 0;
-          if (n < 2) {
-            var delay = 800 + n * 700; // percobaan ke-1: 800ms, ke-2: 1500ms
-            return new Promise(function (resolve) {
-              setTimeout(function () { resolve(api(action, data, n + 1)); }, delay);
-            });
-          }
-        }
+        if (!res.ok && res.code === 'BUSY' && n < 2) return again();
         return res;
+      }, function (err) { // jaringan putus, respons bukan JSON, atau timeout
+        clearTimeout(timer);
+        if (SAFE_RETRY[action] && n < 2) return again();
+        if (err && err.name === 'AbortError') throw new Error('Server terlalu lama merespons. Coba lagi.');
+        throw err;
       });
   }
   function stopTimer() { if (S.timer) { clearInterval(S.timer); S.timer = null; } stopMemTimer(); }
@@ -714,14 +725,28 @@
       return '<figure class="lc-fig" data-fid="' + esc(f) + '">' + figInner(f) + '</figure>';
     }).join('') + '</div>';
   }
-  function fetchImg(f) {
+  var imgQ = {};                                // fid -> qid pemilik gambar
+  var imgWait = [], imgBusy = 0, IMG_MAX = 3;   // maks. 3 gambar diunduh bersamaan
+  function imgPump() {
+    while (imgBusy < IMG_MAX && imgWait.length) {
+      var job = imgWait.shift(); imgBusy++;
+      job().then(function () { imgBusy--; imgPump(); });
+    }
+  }
+  function fetchImg(f, qid) {
+    if (qid) imgQ[f] = qid;
     if (S.img[f] && S.img[f] !== 'err') return Promise.resolve();
     if (S.imgP[f]) return S.imgP[f];
-    S.imgP[f] = api('image', { fid: f }).then(function (r) {
-      if (!r.ok) throw new Error(r.error || 'gagal');
-      S.img[f] = 'data:' + r.mime + ';base64,' + r.data;
-    }).catch(function () { S.img[f] = 'err'; })
-      .then(function () { delete S.imgP[f]; });
+    S.imgP[f] = new Promise(function (resolve) {
+      imgWait.push(function () {
+        return api('image', { fid: f, qid: imgQ[f] || '' }).then(function (r) {
+          if (!r.ok) throw new Error(r.error || 'gagal');
+          S.img[f] = 'data:' + r.mime + ';base64,' + r.data;
+        }).catch(function () { S.img[f] = 'err'; })
+          .then(function () { delete S.imgP[f]; resolve(); });
+      });
+      imgPump();
+    });
     return S.imgP[f];
   }
   function fillFig(f) {
@@ -735,7 +760,7 @@
   }
   function loadImgs(q) {
     return Promise.all(allImgIds(q).map(function (f) {
-      return fetchImg(f).then(function () { fillFig(f); });
+      return fetchImg(f, q.qid).then(function () { fillFig(f); });
     }));
   }
   // Preload semua gambar dari sekumpulan soal (satu batch, atau satu soal admin)
@@ -746,7 +771,7 @@
       (q.images || []).forEach(function (f) { if (ids.indexOf(f) < 0) ids.push(f); });
     });
     if (!ids.length) return Promise.resolve();
-    return Promise.all(ids.map(fetchImg));
+    return Promise.all(ids.map(function (f) { return fetchImg(f); }));
   }
   function zoomImg(src) {
     var ov = document.createElement('div');
@@ -845,16 +870,9 @@
     S.reloadResume = !!resumeAfterLogin;
     if (!S.token) { S.screen = 'login'; return render(); }
     viewLoading('Menyiapkan akunmu…');
-    // config & status tidak saling bergantung, jadi dijalankan BERSAMAAN (bukan berurutan)
-    // supaya waktu tunggu total = permintaan yang paling lambat, bukan jumlah keduanya.
-    Promise.all([
-      api('config').catch(function () { return null; }),
-      api('status')
-    ]).then(function (results) {
-      var cfg = results[0], res = results[1];
-      if (cfg && cfg.ok) {
-        // Sinkronkan batas yang bisa diatur admin lewat tab Pengaturan di Sheets,
-        // supaya hint di form (estimasi waktu, jumlah gambar, rentang rubrik) selalu sesuai.
+    api('status').then(function (res) {
+      var cfg = res && res.ok ? res.cfg : null;
+      if (cfg) {
         CONFIG.MIN_EST = cfg.minEst; CONFIG.MAX_EST = cfg.maxEst;
         CONFIG.MAX_IMAGES = cfg.maxImages; CONFIG.TIME_TOLERANCE = cfg.timeTolerance;
         if (cfg.rubricMin != null) CONFIG.RUBRIC_MIN = cfg.rubricMin;
@@ -862,8 +880,6 @@
         if (cfg.memberOptImages != null) CONFIG.MEMBER_OPT_IMAGES = !!cfg.memberOptImages;
         if (cfg.memberFormatting != null) CONFIG.MEMBER_FORMATTING = !!cfg.memberFormatting;
       }
-      return res;
-    }).then(function (res) {
       if (!res.ok) throw new Error(res.error || 'Gagal memuat status.');
       S.id = res.id; S.nama = res.nama || ''; S.role = res.role;
       S.made = res.made; S.madeThisBatch = res.madeThisBatch || 0;
@@ -1316,7 +1332,7 @@
       '<button class="lc-btn ghost" id="lc-back">' + (isAdmin ? 'Kembali ke daftar soal' : 'Kembali ke menu') + '</button></div></div>';
 
     app.querySelector('#lc-begin').onclick = function () {
-  api('begin', { qid: S.qs[0].qid }).catch(function () {}); // fire-and-forget, server no-op utk admin
+
   S.screen = 'question'; render();
 };
     app.querySelector('#lc-back').onclick = exitBack;
@@ -1424,9 +1440,10 @@
     loadImgs(q).then(function () {
       if (S.screen !== 'question' || S.qs[0] !== current) return;
       S.t0 = Date.now(); S.started = true; btn.disabled = !answerReady(q);
+      api('begin', { qid: q.qid }).catch(function () {}); // titik awal di server = saat stopwatch mulai
       stopTimer();
       S.timer = setInterval(function () { sw.textContent = fmt(S.base + (Date.now() - S.t0) / 1000); }, 250);
-      if (S.qs[1]) allImgIds(S.qs[1]).forEach(fetchImg); // siapkan gambar soal berikutnya
+      if (S.qs[1]) allImgIds(S.qs[1]).forEach(function (f) { fetchImg(f, S.qs[1].qid); }); // siapkan gambar soal berikutnya
     });
   }
 
@@ -1541,7 +1558,8 @@
 
     send.onclick = function () {
       S.busy = true; send.disabled = true; send.textContent = 'Menyimpan…';
-      var payload = { qid: q.qid, actualSec: S.actual, ratings: S.ratings, note: S.note };
+      var payload = { qid: q.qid, actualSec: S.actual, ratings: S.ratings, note: S.note,
+        last: S.mode === 'reviewer' && S.qs.length === 1 };
       if (q.type === 'pg') payload.choice = S.choice; else payload.text = S.choice;
       api('submit', payload).then(function (res) {
         S.busy = false;
@@ -1550,7 +1568,7 @@
         dropProg(q.qid);
         if (S.mode === 'reviewer') {
           S.qs.shift(); S.batchDone += 1; S.choice = null;
-          if (S.qs.length) { api('begin', { qid: S.qs[0].qid }).catch(function () {}); enterQuestion(true); }
+          if (S.qs.length) { enterQuestion(true); }
           else {
             // Status "ada soal baru?" sudah dihitung server di respons submit,
             // jadi halaman Selesai langsung tampil benar tanpa berkedip.
@@ -2214,7 +2232,7 @@
       '<div class="lc-fieldset">' +
       '<label class="lc-label" for="lc-soal">Soal</label>' +
       '<textarea class="lc-textarea" id="lc-soal" maxlength="3000" placeholder="Tulis soal di sini. Bungkus kode dengan ```, rumus dengan $ atau $$, *tebal* dengan tanda bintang, dan _miring_ dengan garis bawah.">' + esc(S.formSoal) + '</textarea>' +
-      '<p class="lc-mute lc-hintline">5–3000 karakter. Contoh: <code>*tebal*</code>, <code>_miring_</code>, <code>$a^2 + b^2 = c^2$</code>.</p>' +
+      '<p class="lc-mute lc-hintline">5–3000 karakter. Contoh: <code>*tebal*</code>, <code>_miring_</code>, <code>```print("Hello, World!")```</code>, <code>$a^2 + b^2 = c^2$</code>.</p>' +
       '<div class="lc-q" id="lc-soal-preview" style="margin-top:10px" hidden></div></div>' +
       typeFields +
       '<div class="lc-fieldset"><label class="lc-label" for="lc-est">Estimasi waktu pengerjaan (detik)</label>' +
@@ -2226,7 +2244,7 @@
 
     bindNav();
     S.formImagesKeep.forEach(function (fid) {
-      fetchImg(fid).then(function () {
+      fetchImg(fid, S.editingQid).then(function () {
         var im = app.querySelector('#thumb-' + fid);
         if (im) im.src = (S.img[fid] && S.img[fid] !== 'err') ? S.img[fid] : '';
         if (S.screen === 'create') paintSoalPreview();
@@ -2235,7 +2253,7 @@
     KEYS.forEach(function (k) {
       var fid = S.formOptImgKeep[k];
       if (!fid || S.formOptImgNew[k]) return;
-      fetchImg(fid).then(function () {
+      fetchImg(fid, S.editingQid).then(function () {
         var im = app.querySelector('#optthumb-' + k);
         if (im) im.src = (S.img[fid] && S.img[fid] !== 'err') ? S.img[fid] : '';
         if (S.screen === 'create') paintOptPreview(k);
