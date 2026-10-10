@@ -2351,7 +2351,10 @@
       '<div class="lc-fieldset">' +
       '<label class="lc-label" for="lc-soal">Soal</label>' +
       '<textarea class="lc-textarea lc-autogrow" id="lc-soal" maxlength="3000" placeholder="Tulis soal di sini. Bungkus kode dengan ```, rumus dengan $ atau $$, *tebal* dengan tanda bintang, dan _miring_ dengan garis bawah.">' + esc(S.formSoal) + '</textarea>' +
-      '<p class="lc-mute lc-hintline">Sisipkan gambar di tengah teks dengan menulis <code>[gambar1]</code>, <code>[gambar2]</code>, dst. sesuai nomor di pojok gambar; gambar tanpa penanda tetap tampil di atas soal. Letakkan penanda di luar blok kode. 5–3000 karakter. Contoh: <code>*tebal*</code>, <code>_miring_</code>, <code>```print("Hello, World!")```</code>, <code>$a^2 + b^2 = c^2$</code>.</p>' +
+      '<p class="lc-mute lc-hintline">5–3000 karakter. Contoh: <code>*tebal*</code>, <code>_miring_</code>, <code>```print("Hello, World!")```</code>, <code>$a^2 + b^2 = c^2$</code>.</p>' +
+      '<div class="lc-notice" style="margin-top:10px"><p>Sisipkan gambar di tengah teks dengan menulis <code>[gambar1]</code>, <code>[gambar2]</code>, dst., ' +
+      'sesuai nomor di pojok gambar. Gambar tanpa penanda tetap tampil di atas soal. ' +
+      'Tulis penanda di barisnya sendiri dan di luar blok kode.</p></div>' +
       '<div class="lc-q" id="lc-soal-preview" style="margin-top:10px" hidden></div></div>' +
       typeFields +
       '<div class="lc-fieldset"><label class="lc-label" for="lc-est">Estimasi waktu pengerjaan (detik)</label>' +
