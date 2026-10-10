@@ -51,6 +51,7 @@
     border: 1.5px solid var(--ink); border-radius: 0; padding: 12px 14px;
   }
   .lc-textarea { min-height: 84px; resize: vertical; }
+  .lc-textarea.lc-autogrow { min-height: 180px; max-height: 70vh; overflow-y: auto; }
   .lc-select:disabled { background-color: var(--notice-bg); color: var(--mute); border-color: var(--line); cursor: not-allowed; }
   .lc-select { appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%), linear-gradient(135deg, var(--ink) 50%, transparent 50%); background-position: calc(100% - 20px) center, calc(100% - 15px) center; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 36px; }
   .lc-input:focus-visible, .lc-textarea:focus-visible, .lc-btn:focus-visible, .lc-select:focus-visible,
@@ -2191,6 +2192,13 @@
     S.screen = 'create'; render();
   }
 
+  // Textarea otomatis menyesuaikan tinggi dengan isinya (maks. 70% tinggi layar, lalu scroll di dalam kotak).
+  function autoGrow(el) {
+    el.style.height = 'auto';
+    var max = Math.round(window.innerHeight * 0.7);
+    el.style.height = Math.min(el.scrollHeight + 3, max) + 'px';
+  }
+
   function viewCreate() {
     var isEdit = !!S.editingQid;
     var fromAdminList = S.formOrigin === 'adminlist';
@@ -2281,7 +2289,7 @@
         }
         return '<div class="lc-optfield"><label class="lc-label" for="lc-opt-' + k + '">Pilihan ' + k + '</label>' +
           imgRow +
-          '<textarea class="lc-textarea lc-opt-ta" id="lc-opt-' + k + '" rows="1" maxlength="500">' + esc(S.formOpts[k]) + '</textarea>' +
+          '<textarea class="lc-textarea lc-opt-ta lc-autogrow" id="lc-opt-' + k + '" rows="1" maxlength="500">' + esc(S.formOpts[k]) + '</textarea>' +
           '<div class="lc-q lc-opt-preview" id="lc-optpv-' + k + '" hidden></div></div>';
       }).join('') +
         '<p class="lc-mute lc-hintline" id="lc-optimghint">' +
@@ -2297,7 +2305,7 @@
     } else {
       typeFields = '<div class="lc-fieldset">' +
         '<label class="lc-label" for="lc-answers">Jawaban yang diterima (satu per baris)</label>' +
-        '<textarea class="lc-textarea" id="lc-answers" maxlength="2000" placeholder="Tulis semua variasi jawaban yang benar, satu per baris.">' + esc(S.formAnswers) + '</textarea>' +
+        '<textarea class="lc-textarea lc-autogrow" id="lc-answers" maxlength="2000" placeholder="Tulis semua variasi jawaban yang benar, satu per baris.">' + esc(S.formAnswers) + '</textarea>' +
         '<p class="lc-mute lc-hintline">Reviewer dianggap benar kalau jawabannya cocok dengan salah satu baris ini (maks. 20 variasi).</p></div>' +
         '<div class="lc-fieldset"><label class="lc-toggle"><input type="checkbox" id="lc-cs"' + (S.formCaseSensitive ? ' checked' : '') + '> Perhatikan huruf besar/kecil (case sensitive)</label>' +
         '<p class="lc-mute lc-hintline">Kalau tidak dicentang, "Pascal" dan "pascal" dianggap sama.</p></div>';
@@ -2323,7 +2331,7 @@
       '<p class="lc-mute lc-hintline" id="lc-imghint"></p></div>' +
       '<div class="lc-fieldset">' +
       '<label class="lc-label" for="lc-soal">Soal</label>' +
-      '<textarea class="lc-textarea" id="lc-soal" maxlength="3000" placeholder="Tulis soal di sini. Bungkus kode dengan ```, rumus dengan $ atau $$, *tebal* dengan tanda bintang, dan _miring_ dengan garis bawah.">' + esc(S.formSoal) + '</textarea>' +
+      '<textarea class="lc-textarea lc-autogrow" id="lc-soal" maxlength="3000" placeholder="Tulis soal di sini. Bungkus kode dengan ```, rumus dengan $ atau $$, *tebal* dengan tanda bintang, dan _miring_ dengan garis bawah.">' + esc(S.formSoal) + '</textarea>' +
       '<p class="lc-mute lc-hintline">5–3000 karakter. Contoh: <code>*tebal*</code>, <code>_miring_</code>, <code>```print("Hello, World!")```</code>, <code>$a^2 + b^2 = c^2$</code>.</p>' +
       '<div class="lc-q" id="lc-soal-preview" style="margin-top:10px" hidden></div></div>' +
       typeFields +
@@ -2412,6 +2420,10 @@
       if (asC) asC.onchange = function () { S.formAssigned = asC.checked; viewCreate(); };
     }
     app.querySelector('#lc-est').oninput = function (e) { S.formEst = e.target.value; };
+    app.querySelectorAll('textarea.lc-autogrow').forEach(function (ta) {
+      autoGrow(ta);
+      ta.addEventListener('input', function () { autoGrow(ta); });
+    });
     var bsel = app.querySelector('#lc-batch');
     if (bsel) bsel.onchange = function () { S.formTargetBatch = Number(bsel.value); };
     // Batal / selesai kembali ke tempat asal: daftar soal admin atau "Soal saya".
