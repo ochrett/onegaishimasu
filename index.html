@@ -181,6 +181,8 @@
   .lc-thumb button { position: absolute; top: -9px; right: -9px; width: 24px; height: 24px; border-radius: 50%;
     background: var(--bad); color: #fff; border: 2px solid var(--paper); font-size: 14px; line-height: 1; cursor: pointer; padding: 0; }
   .lc-filebtn { display: inline-block; }
+  .lc-thumbn { position: absolute; left: 0; bottom: 0; background: var(--ink); color: var(--paper);
+    font-size: 11px; line-height: 1.4; padding: 1px 6px; }
   .lc-filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
 
   /* Dialog konfirmasi */
@@ -825,6 +827,23 @@
     });
   }
 
+  // Teks soal + gambar. Gambar yang ditandai [gambarN] muncul di posisi penanda;
+  // gambar tanpa penanda tetap di atas teks seperti biasa.
+  function questionBody(q) {
+    var imgs = q.images || [], used = {}, html = '';
+    var parts = String(q.soal || '').split(/\[gambar(\d+)\]/i); // [teks, N, teks, N, ...]
+    for (var i = 0; i < parts.length; i++) {
+      if (i % 2 === 0) { html += rich(parts[i]); continue; }
+      var f = imgs[Number(parts[i]) - 1];
+      if (f && !used[f]) {
+        used[f] = 1;
+        html += '<div class="lc-imgs"><figure class="lc-fig" data-fid="' + esc(f) + '">' + figInner(f) + '</figure></div>';
+      }
+    }
+    var rest = imgs.filter(function (f) { return !used[f]; });
+    return imgHtml({ images: rest }) + html;
+  }
+
   /* ====== VIEW: LOGIN ====== */
   function viewLogin() {
     app.innerHTML =
@@ -1435,7 +1454,7 @@
       '<div class="lc-mute">' + sub + '</div></div>' +
       '<div class="lc-sw" id="lc-sw" role="timer" aria-label="Waktu pengerjaan">' + fmt(S.base) + '</div></div>' +
       (S.mode === 'reviewer' ? '<div class="lc-bar"><i style="width:' + Math.round((S.batchDone / S.batchTotal) * 100) + '%"></i></div>' : '<div class="lc-bar"><i style="width:0%"></i></div>') + '</div>' +
-      '<div class="lc-q">' + imgHtml(q) + rich(q.soal) + '</div>' +
+      '<div class="lc-q">' + questionBody(q) + '</div>' +
       answerHtml +
       '<div class="lc-actions"><button class="lc-btn" id="lc-done" disabled>Selesai mengerjakan</button>' +
       (skipQid ? '<button class="lc-btn ghost" id="lc-skip">Lewati ke soal berikutnya (' + esc(skipQid) + ')</button>' : '') +
@@ -1509,9 +1528,9 @@
         return '<div class="lc-opt-static' + (o.key === S.key ? ' key' : '') + '"><b>' + esc(o.key) + '.</b>' + optBody(o.text, (q.optImages || {})[o.key]) +
           (o.key === S.key ? '<span class="lc-mute" style="white-space:nowrap">(kunci)</span>' : '') + '</div>';
       }).join('');
-      keyBlock = '<details class="lc-details"><summary>Lihat soal dan kunci</summary><div class="lc-q" style="margin-top:8px">' + imgHtml(q) + rich(q.soal) + keyOpts + '</div></details>';
+      keyBlock = '<details class="lc-details"><summary>Lihat soal dan kunci</summary><div class="lc-q" style="margin-top:8px">' + questionBody(q) + keyOpts + '</div></details>';
     } else {
-      keyBlock = '<details class="lc-details"><summary>Lihat soal dan jawaban yang diterima</summary><div class="lc-q" style="margin-top:8px">' + imgHtml(q) + rich(q.soal) +
+      keyBlock = '<details class="lc-details"><summary>Lihat soal dan jawaban yang diterima</summary><div class="lc-q" style="margin-top:8px">' + questionBody(q) +
         '<div class="lc-opt-static key">Jawaban diterima: ' + esc(S.key) + '</div></div></details>';
     }
 
@@ -2311,11 +2330,11 @@
         '<p class="lc-mute lc-hintline">Kalau tidak dicentang, "Pascal" dan "pascal" dianggap sama.</p></div>';
     }
 
-    var keepThumbs = S.formImagesKeep.map(function (fid) {
-      return '<div class="lc-thumb" data-keep="' + esc(fid) + '"><img id="thumb-' + esc(fid) + '" alt="Gambar soal"><button type="button" data-remove-keep="' + esc(fid) + '">×</button></div>';
+    var keepThumbs = S.formImagesKeep.map(function (fid, i) {
+      return '<div class="lc-thumb" data-keep="' + esc(fid) + '"><img id="thumb-' + esc(fid) + '" alt="Gambar soal"><span class="lc-thumbn">[gambar' + (i + 1) + ']</span><button type="button" data-remove-keep="' + esc(fid) + '">×</button></div>';
     }).join('');
     var newThumbs = S.formImagesNew.map(function (im, i) {
-      return '<div class="lc-thumb"><img src="' + im.preview + '" alt="Gambar baru"><button type="button" data-remove-new="' + i + '">×</button></div>';
+      return '<div class="lc-thumb"><img src="' + im.preview + '" alt="Gambar baru"><span class="lc-thumbn">[gambar' + (S.formImagesKeep.length + i + 1) + ']</span><button type="button" data-remove-new="' + i + '">×</button></div>';
     }).join('');
     var totalImgs = S.formImagesKeep.length + S.formImagesNew.length;
 
@@ -2332,7 +2351,7 @@
       '<div class="lc-fieldset">' +
       '<label class="lc-label" for="lc-soal">Soal</label>' +
       '<textarea class="lc-textarea lc-autogrow" id="lc-soal" maxlength="3000" placeholder="Tulis soal di sini. Bungkus kode dengan ```, rumus dengan $ atau $$, *tebal* dengan tanda bintang, dan _miring_ dengan garis bawah.">' + esc(S.formSoal) + '</textarea>' +
-      '<p class="lc-mute lc-hintline">5–3000 karakter. Contoh: <code>*tebal*</code>, <code>_miring_</code>, <code>```print("Hello, World!")```</code>, <code>$a^2 + b^2 = c^2$</code>.</p>' +
+      '<p class="lc-mute lc-hintline">Sisipkan gambar di tengah teks dengan menulis <code>[gambar1]</code>, <code>[gambar2]</code>, dst. sesuai nomor di pojok gambar; gambar tanpa penanda tetap tampil di atas soal. Letakkan penanda di luar blok kode. 5–3000 karakter. Contoh: <code>*tebal*</code>, <code>_miring_</code>, <code>```print("Hello, World!")```</code>, <code>$a^2 + b^2 = c^2$</code>.</p>' +
       '<div class="lc-q" id="lc-soal-preview" style="margin-top:10px" hidden></div></div>' +
       typeFields +
       '<div class="lc-fieldset"><label class="lc-label" for="lc-est">Estimasi waktu pengerjaan (detik)</label>' +
@@ -2363,7 +2382,7 @@
     function previewImages() {
       var out = [];
       S.formImagesKeep.forEach(function (fid) {
-        if (S.img[fid] && S.img[fid] !== 'err') out.push(S.img[fid]);
+        out.push((S.img[fid] && S.img[fid] !== 'err') ? S.img[fid] : ''); // simpan slot kosong supaya nomor [gambarN] tetap sejajar
       });
       S.formImagesNew.forEach(function (im) { out.push(im.preview); });
       return out;
@@ -2376,15 +2395,22 @@
     function paintSoalPreview() {
       var pv = app.querySelector('#lc-soal-preview');
       if (!pv) return;
-      var imgs = previewImages();
-      var show = (canFormat() && hasFormat(S.formSoal)) || imgs.length > 0;
+      var imgs = previewImages(); // urutannya = [gambar1], [gambar2], ...
+      var anyImg = imgs.some(function (s) { return !!s; });
+      var show = (canFormat() && hasFormat(S.formSoal)) || anyImg;
       pv.hidden = !show;
       if (!show) { pv.innerHTML = ''; return; }
-      pv.innerHTML =
-        (imgs.length ? '<div class="lc-imgs">' + imgs.map(function (src) {
-          return '<figure class="lc-fig"><img class="lc-img" style="cursor:default" alt="Gambar pada soal" src="' + src + '"></figure>';
-        }).join('') + '</div>' : '') +
-        rich(S.formSoal);
+      var fig = function (src) {
+        return '<figure class="lc-fig"><img class="lc-img" style="cursor:default" alt="Gambar pada soal" src="' + src + '"></figure>';
+      };
+      var parts = S.formSoal.split(/\[gambar(\d+)\]/i), used = {}, html = '';
+      for (var i = 0; i < parts.length; i++) {
+        if (i % 2 === 0) { html += rich(parts[i]); continue; }
+        var n = Number(parts[i]);
+        if (imgs[n - 1] && !used[n]) { used[n] = 1; html += '<div class="lc-imgs">' + fig(imgs[n - 1]) + '</div>'; }
+      }
+      var top = imgs.map(function (s, k) { return (s && !used[k + 1]) ? fig(s) : ''; }).join('');
+      pv.innerHTML = (top ? '<div class="lc-imgs">' + top + '</div>' : '') + html;
       renderMath(pv);
     }
     function paintOptPreview(k) {
