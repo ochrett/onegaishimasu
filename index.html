@@ -51,6 +51,7 @@
     border: 1.5px solid var(--ink); border-radius: 0; padding: 12px 14px;
   }
   .lc-textarea { min-height: 84px; resize: vertical; }
+  .lc-select:disabled { background-color: var(--notice-bg); color: var(--mute); border-color: var(--line); cursor: not-allowed; }
   .lc-select { appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%), linear-gradient(135deg, var(--ink) 50%, transparent 50%); background-position: calc(100% - 20px) center, calc(100% - 15px) center; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 36px; }
   .lc-input:focus-visible, .lc-textarea:focus-visible, .lc-btn:focus-visible, .lc-select:focus-visible,
   .lc-theme:focus-visible, .lc-opt input:focus-visible + span, .lc-range:focus-visible { outline: 3px solid #2b6df6; outline-offset: 2px; }
@@ -387,6 +388,7 @@
   var S = {
     screen: 'login', id: '', token: '', nama: '', role: 'anggota', err: '', flash: '', busy: false,
     theme: 'light', trial: false,
+    reviewBatch: null, sessionBatch: null, quotaBatches: [], formTargetBatch: 1,
 
     // status ringkas
     made: 0, madeThisBatch: 0, maxQuestionsPerBatch: 0, batch: 0, batchMax: 0, hasBatch: false, batchTotal: 0, batchDone: 0, currentBatch: 1,
@@ -889,10 +891,12 @@
       S.maxQuestionsPerBatch = res.maxQuestionsPerBatch; S.currentBatch = res.currentBatch;
       S.memberReviewOpen = res.memberReviewOpen; S.memberReviewReason = res.memberReviewReason || '';
       S.memberCreateOpen = res.memberCreateOpen; S.allowedTypes = res.allowedTypes || 'KEDUANYA';
+      S.quotaBatches = res.quotaBatches || [];
       S.membersOpen = res.role === 'admin' || res.membersOpen !== false;
       startPing();
       if (res.role !== 'admin') {
         S.batch = res.batch; S.hasBatch = res.hasBatch; S.batchTotal = res.batchTotal; S.batchDone = res.batchDone;
+        S.reviewBatch = res.reviewBatch == null ? null : Number(res.reviewBatch);
         S.hasNewBatchAvailable = !!res.hasNewBatchAvailable;
       }
       S.err = '';
@@ -945,7 +949,7 @@
   function createStatusKind(createOpen) {
     if (!createOpen) return 'na';
     if (S.role === 'admin') return 'available';
-    if (S.maxQuestionsPerBatch && S.madeThisBatch >= S.maxQuestionsPerBatch) return 'completed';
+    if (!(S.quotaBatches || []).length) return 'completed';
     return 'available';
   }
 
@@ -958,22 +962,29 @@
     var batchInfo = '<p class="lc-mute" style="margin-bottom:14px">Soal baru yang kamu buat, dan soal yang bisa direview (campuran pilihan ganda &amp; isian singkat), mengikuti batch aktif.</p>';
     var reviewerCard = '';
     if (!isAdmin) {
+      var rbNum = S.reviewBatch == null ? null : Number(S.reviewBatch);
+      var pastReview = S.memberReviewOpen && rbNum !== null && rbNum !== Number(S.currentBatch);
+      var bl = pastReview ? ' (' + batchName(rbNum) + ')' : '';
+      var pastNotice = pastReview
+        ? '<div class="lc-notice"><p>Ada penugasan review dari <strong>' + esc(batchName(rbNum)) + '</strong> yang belum kamu kerjakan. ' +
+          'Penugasan ini harus diselesaikan terlebih dahulu sebelum mengerjakan batch aktif.</p></div>'
+        : '';
       var body;
       if (!S.memberReviewOpen) {
         body = '<div class="lc-notice"><p>' + esc(S.memberReviewReason || 'Menu review sedang ditutup.') + '</p></div>' +
           '<p class="lc-mute">Menu ini akan terbuka lagi otomatis. Muat ulang halaman untuk memeriksa status terbaru.</p>';
       } else if (!S.hasBatch) {
         if (S.hasNewBatchAvailable) {
-          body = '<p>Kamu belum mengambil soal untuk direview.</p><button class="lc-btn" id="lc-start">Mulai review</button>';
+          body = '<p>Kamu belum mengambil soal untuk direview.</p><button class="lc-btn" id="lc-start">Mulai review' + bl + '</button>';
         } else {
           body = '<p class="lc-mute">Belum ada soal baru yang bisa kamu review saat ini. Coba lagi nanti.</p>';
         }
       } else if (S.batchDone < S.batchTotal) {
         body = '<p>Sesi ke-' + S.batch + ' — ' + S.batchDone + '/' + S.batchTotal + ' soal selesai.</p>' +
-          '<button class="lc-btn" id="lc-start">Lanjutkan review</button>';
+          '<button class="lc-btn" id="lc-start">Lanjutkan review' + bl + '</button>';
       } else if (S.hasNewBatchAvailable) {
         body = '<p>Sesi ke-' + S.batch + ' sudah selesai semua.</p>' +
-          '<button class="lc-btn" id="lc-newbatch">Ambil soal baru</button>';
+          '<button class="lc-btn" id="lc-newbatch">Ambil soal baru' + bl + '</button>';
       } else {
         body = '<p>Kamu sudah selesai mereview semua soal yang tersedia.</p>' +
           '<button class="lc-btn" disabled>Ambil soal baru</button>' +
@@ -982,7 +993,7 @@
       var trialLink = Number(S.currentBatch) !== 0
         ? '<p class="lc-mute" style="margin:14px 0 0">Coba simulasi review soal <button type="button" class="lc-linkbtn" id="lc-trial">di sini</button>.</p>'
         : '';
-      reviewerCard = '<div class="lc-card"><div class="lc-card-h"><h3>Review soal</h3>' + statusBadge(reviewStatusKind()) + '</div>' + batchInfo + body + trialLink + '</div>';
+      reviewerCard = '<div class="lc-card"><div class="lc-card-h"><h3>Review soal</h3>' + statusBadge(reviewStatusKind()) + '</div>' + batchInfo + pastNotice + body + trialLink + '</div>';
     } else {
       reviewerCard =
         '<div class="lc-card"><h3>Review soal (mode admin)</h3>' + batchInfo +
@@ -998,11 +1009,13 @@
 
     var maxQTxt = (isAdmin || !S.maxQuestionsPerBatch) ? 'tanpa batas per batch' : (S.madeThisBatch + ' dari ' + S.maxQuestionsPerBatch + ' untuk batch ini');
     var typeTxt = TYPE_LABELS[S.allowedTypes] || S.allowedTypes;
+    var oldQuota = (S.quotaBatches || []).filter(function (b) { return Number(b) !== Number(S.currentBatch); });
     var soalCard;
     if (createOpen) {
       soalCard =
         '<div class="lc-card"><div class="lc-card-h"><h3>Soal saya</h3>' + statusBadge(createStatusKind(createOpen)) + '</div>' +
-        '<p>Kamu sudah membuat ' + S.made + ' soal total (' + maxQTxt + '). Soal barunya otomatis masuk ' + esc(batchName(S.currentBatch)) + '.</p>' +
+        '<p>Kamu sudah membuat ' + S.made + ' soal total (' + maxQTxt + '). Kamu bisa memilih batch tujuan soal baru' +
+        (oldQuota.length ? ' (masih ada kuota di ' + esc(oldQuota.map(function (b) { return batchName(b); }).join(', ')) + ')' : '') + '.</p>' +
         (isAdmin ? '' : '<p class="lc-mute">Tipe soal yang bisa kamu buat: ' + esc(typeTxt) + '.</p>') +
         '<button class="lc-btn" id="lc-mine">Kelola soal saya</button></div>';
     } else {
@@ -1093,6 +1106,7 @@
       if (!res.ok) throw new Error(res.error || 'Gagal memuat.');
       S.mode = 'reviewer';
       S.trial = !!res.trial;
+      S.sessionBatch = res.reviewBatch == null ? null : Number(res.reviewBatch);
       S.qs = res.questions; S.batchTotal = res.batchTotal; S.batchDone = res.batchDone;
       S.batch = res.batch; S.choice = null;
       if (!S.qs.length) { S.hasNewBatchAvailable = false; S.screen = 'done'; return render(); }
@@ -1116,7 +1130,7 @@
     viewLoading('Menyiapkan simulasi review…');
     api('trial_start').then(function (res) {
       if (!res.ok) throw new Error(res.error || 'Gagal memuat simulasi.');
-      S.mode = 'reviewer'; S.trial = true;
+      S.mode = 'reviewer'; S.trial = true; S.sessionBatch = 0;
       S.qs = res.questions; S.batchTotal = res.batchTotal; S.batchDone = 0; S.batch = 0; S.choice = null;
       enterQuestion();
     }).catch(function (e) {
@@ -1352,9 +1366,13 @@
     var isAdmin = S.mode === 'admin';
     var heading = isAdmin ? 'Mode admin — ' + esc(q.qid) : 'Soal ' + (S.batchDone + 1) + ' dari ' + S.batchTotal;
     var resume = el > 0;
+    var rbHead = isAdmin
+      ? ((S.adminListData || []).filter(function (x) { return x.qid === q.qid; })[0] || {}).batch
+      : S.sessionBatch;
 
     app.innerHTML =
-      '<div class="lc-rule"></div><h2>' + heading + '</h2>' +
+      '<div class="lc-rule"></div><div class="lc-titlerow"><h2>' + heading + '</h2>' +
+      (rbHead != null ? '<h2>' + esc(batchName(rbHead)) + '</h2>' : '') + '</div>' +
       '<div class="lc-card" style="margin-top:18px"><h3>' + (resume ? 'Lanjutkan soal ini?' : 'Siap mengerjakan soal ini?') + '</h3>' +
       '<p>Soal belum ditampilkan. Stopwatch mulai berjalan setelah kamu menekan tombol di bawah, dan berhenti saat kamu menekan Selesai mengerjakan.</p>' +
       (resume ? '<p>Kamu sudah mengerjakan soal ini selama <strong>' + fmt(el) + '</strong>. Stopwatch dilanjutkan dari waktu itu.</p>' : '') +
@@ -1936,6 +1954,7 @@
       if (!res.ok) throw new Error(res.error || 'Gagal memuat.');
       S.mineList = res.questions; S.mineMade = res.made; S.mineMax = res.max;
       S.mineMadeThisBatch = res.madeThisBatch || 0;
+      S.quotaBatches = res.quotaBatches || [];
       S.memberCreateOpen = res.memberCreateOpen;
       S.allowedTypes = res.allowedTypes || 'KEDUANYA';
       S.mineOverall = res.overall || null;
@@ -2038,7 +2057,7 @@
   function viewMine() {
     var createOpen = S.role === 'admin' || S.memberCreateOpen;
     var note = S.mineNote; S.mineNote = null;
-    var canAdd = createOpen && (S.role === 'admin' || !S.mineMax || S.mineMadeThisBatch < S.mineMax);
+    var canAdd = createOpen && (S.role === 'admin' || (S.quotaBatches || []).length > 0);
     var rows = S.mineList.map(function (q) {
       var canEdit = q.editable;
       var typeBadge = '<span class="lc-badge">' + esc(typeLabel(q.type)) + '</span>';
@@ -2132,6 +2151,7 @@
   // maupun admin_question_full: { qid, type, soal, est, images, options/answer | answers/caseSensitive }.
   function fillForm(q) {
     S.editingQid = q.qid; S.formType = q.type; S.formSoal = q.soal;
+    S.formTargetBatch = Number(q.batch);
     S.formOpts = { A: '', B: '', C: '', D: '', E: '' };
     S.formAnswer = ''; S.formAnswers = ''; S.formCaseSensitive = false;
     S.formAssigned = q.assigned !== false;
@@ -2163,6 +2183,9 @@
       S.formOpts = { A: '', B: '', C: '', D: '', E: '' };
       S.formAnswer = ''; S.formAnswers = ''; S.formCaseSensitive = false;
       S.formAssigned = false; // admin: soal baru default TIDAK ditugaskan ke anggota
+      // Default: admin = batch aktif; anggota = batch TERLAMA yang masih punya kuota.
+      S.formTargetBatch = (S.role === 'admin' || !(S.quotaBatches || []).length)
+        ? Number(S.currentBatch) : Number(S.quotaBatches[0]);
       S.formEst = ''; S.formImagesKeep = [];
     }
     S.screen = 'create'; render();
@@ -2207,6 +2230,39 @@
           : 'Soal ini TIDAK masuk antrean review anggota sampai kamu menyalakan ini. Kamu tetap bisa membukanya sendiri dari daftar soal.') +
         '</p></div>'
       : '';
+
+    // Dropdown batch tujuan. Anggota: hanya batch yang kuotanya masih ada, dan terkunci saat edit.
+    // Admin: batch mana pun (batch aktif di urutan pertama); soal Batch Trial tidak bisa dipindah ke batch biasa.
+    var activeB = Number(S.currentBatch), choices = [], batchLocked = false, batchHint = '';
+    if (S.role === 'admin') {
+      var curB = Number(S.formTargetBatch);
+      if (isEdit && curB === 0) {
+        choices = [0]; batchLocked = true;
+        batchHint = 'Soal Batch Trial tidak bisa dipindah ke batch biasa.';
+      } else {
+        var loB = isEdit ? 1 : 0, hiB = Math.max(activeB + 1, isEdit ? curB : 0), restB = [];
+        for (var bi = loB; bi <= hiB; bi++) if (bi !== activeB) restB.push(bi);
+        choices = (activeB >= loB ? [activeB] : []).concat(restB);
+        batchHint = 'Sebagai admin, kamu bisa menaruh soal di batch mana pun.';
+      }
+    } else if (isEdit) {
+      choices = [Number(S.formTargetBatch)]; batchLocked = true;
+      batchHint = 'Batch soal tidak bisa diubah oleh anggota.';
+    } else {
+      choices = (S.quotaBatches || []).map(Number);
+      if (!choices.length) choices = [activeB];
+      batchLocked = choices.length <= 1;
+      batchHint = batchLocked
+        ? 'Tidak ada batch lain yang masih punya kuota, jadi soal masuk ke ' + batchName(choices[0]) + '.'
+        : 'Pilih batch tempat soal ini dimasukkan. Yang tampil hanya batch yang kuota soalmu masih tersisa.';
+    }
+    if (choices.indexOf(Number(S.formTargetBatch)) < 0) S.formTargetBatch = choices[0];
+    var batchSelector = '<div class="lc-fieldset" style="margin-top:14px"><label class="lc-label" for="lc-batch">Batch</label>' +
+      '<select class="lc-select" id="lc-batch"' + (batchLocked ? ' disabled' : '') + '>' +
+      choices.map(function (b) {
+        return '<option value="' + b + '"' + (b === Number(S.formTargetBatch) ? ' selected' : '') + '>' +
+          esc(batchName(b)) + (b === activeB ? ' (aktif)' : '') + '</option>';
+      }).join('') + '</select><p class="lc-mute lc-hintline">' + esc(batchHint) + '</p></div>';
 
     var typeFields;
     if (S.formType === 'pg') {
@@ -2259,6 +2315,7 @@
       '<div class="lc-rule"></div><h2>' + (isEdit ? 'Ubah soal ' + esc(S.editingQid) : 'Buat soal baru') + '</h2>' +
       originNote +
       assignToggle +
+      batchSelector +
       typeSelector +
       '<div class="lc-fieldset" style="margin-top:18px"><label class="lc-label">Gambar (opsional, maks. ' + CONFIG.MAX_IMAGES + ')</label>' +
       '<div class="lc-thumbs" id="lc-thumbs">' + keepThumbs + newThumbs + '</div>' +
@@ -2355,6 +2412,8 @@
       if (asC) asC.onchange = function () { S.formAssigned = asC.checked; viewCreate(); };
     }
     app.querySelector('#lc-est').oninput = function (e) { S.formEst = e.target.value; };
+    var bsel = app.querySelector('#lc-batch');
+    if (bsel) bsel.onchange = function () { S.formTargetBatch = Number(bsel.value); };
     // Batal / selesai kembali ke tempat asal: daftar soal admin atau "Soal saya".
     app.querySelector('#lc-cancel').onclick = function () {
       if (fromAdminList) openAdminList();
@@ -2431,6 +2490,7 @@
         payload.caseSensitive = S.formCaseSensitive;
       }
       if (S.role === 'admin') payload.assigned = S.formAssigned;
+      if (!isEdit || S.role === 'admin') payload.batch = S.formTargetBatch;
       if (isEdit) { payload.qid = editQid; payload.keepImages = S.formImagesKeep; }
       api(isEdit ? 'update' : 'create', payload).then(function (res) {
         S.formBusy = false;
@@ -2477,7 +2537,7 @@
         title: isEdit ? 'Perbarui soal ini?' : 'Simpan soal ini?',
         text: isEdit
           ? 'Perubahan akan menimpa isi soal sebelumnya.'
-          : 'Soal akan masuk ke ' + batchName(S.currentBatch) + ' dan bisa diberikan ke reviewer. Kemampuan mengedit setelah itu mengikuti pengaturan admin.',
+          : 'Soal akan masuk ke ' + batchName(S.formTargetBatch) + ' dan bisa diberikan ke reviewer. Kemampuan mengedit setelah itu mengikuti pengaturan admin.',
         detail: (S.formType === 'pg'
           ? 'Kunci jawaban: ' + S.formAnswer
           : 'Jumlah variasi jawaban: ' + ansList.length + (S.formCaseSensitive ? ' (case sensitive)' : ' (tidak case sensitive)')) +
