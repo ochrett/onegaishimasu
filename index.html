@@ -615,6 +615,10 @@
     var el = document.getElementById('lc-draftstat');
     if (el) el.textContent = msg;
   }
+  function clock(d, withSec) {
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return p(d.getHours()) + ':' + p(d.getMinutes()) + (withSec ? ':' + p(d.getSeconds()) : '');
+  }
   function writeDraft() {
     if (S.formOrigin !== 'mine' || S.formBusy) return;
     try {
@@ -630,8 +634,7 @@
         answers: S.formAnswers, cs: S.formCaseSensitive, est: S.formEst,
         batch: S.formTargetBatch, assigned: S.formAssigned
       }));
-      paintDraftStat('✓ Draf tersimpan otomatis · ' +
-        new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      paintDraftStat('✓ Draf tersimpan otomatis · ' + clock(new Date(), true));
     } catch (e) {
       paintDraftStat('Draf tidak bisa disimpan otomatis di browser ini. Simpan soal sebelum menutup halaman.');
     }
@@ -2266,8 +2269,7 @@
     S.draftNote = '';
     if (dr) {
       applyDraft(dr);
-      S.draftNote = 'Draf yang belum disimpan dipulihkan (' +
-        new Date(dr.t).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) +
+      S.draftNote = 'Draf yang belum disimpan dipulihkan (' + clock(new Date(dr.t), true) +
         '). Gambar perlu ditambahkan lagi.';
     }
     S.screen = 'create'; render();
