@@ -602,6 +602,60 @@
   function prog(qid) { return S.prog[qid] || (S.prog[qid] = {}); }
   function dropProg(qid) { delete S.prog[qid]; saveProg(); }
 
+  /* ====== Draf soal (tersimpan otomatis saat membuat / mengubah soal) ======
+     Disimpan di sessionStorage per ID dan per soal (soal baru = 'new'), sama seperti progres review.
+     Gambar TIDAK ikut disimpan (ukurannya besar), jadi harus ditambahkan lagi setelah draf dipulihkan. */
+  var draftTimer = null;
+  function draftKey(qid) { return 'lc_draft_' + S.id + '_' + (qid || 'new'); }
+  function readDraft(qid) {
+    try { return JSON.parse(sessionStorage.getItem(draftKey(qid)) || 'null'); } catch (e) { return null; }
+  }
+  var DRAFT_IDLE_MSG = 'Draf tersimpan otomatis selama tab ini terbuka.';
+  function paintDraftStat(msg) {
+    var el = document.getElementById('lc-draftstat');
+    if (el) el.textContent = msg;
+  }
+  function writeDraft() {
+    if (S.formOrigin !== 'mine' || S.formBusy) return;
+    try {
+      var empty = !S.formSoal.trim() && !S.formAnswers.trim() && !String(S.formEst).trim() &&
+        !KEYS.some(function (k) { return (S.formOpts[k] || '').trim(); });
+      if (empty) {
+        sessionStorage.removeItem(draftKey(S.editingQid));
+        paintDraftStat(DRAFT_IDLE_MSG);
+        return;
+      }
+      sessionStorage.setItem(draftKey(S.editingQid), JSON.stringify({
+        t: Date.now(), type: S.formType, soal: S.formSoal, opts: S.formOpts, answer: S.formAnswer,
+        answers: S.formAnswers, cs: S.formCaseSensitive, est: S.formEst,
+        batch: S.formTargetBatch, assigned: S.formAssigned
+      }));
+      paintDraftStat('✓ Draf tersimpan otomatis · ' +
+        new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch (e) {
+      paintDraftStat('Draf tidak bisa disimpan otomatis di browser ini. Simpan soal sebelum menutup halaman.');
+    }
+  }
+  function saveDraft() { // ditunda 0,4 detik supaya tidak menulis di setiap ketikan
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(writeDraft, 400);
+  }
+  function dropDraft(qid) {
+    clearTimeout(draftTimer);
+    try { sessionStorage.removeItem(draftKey(qid)); } catch (e) {}
+  }
+  function applyDraft(d) {
+    if (d.type === 'pg' || d.type === 'isian') {
+      if (S.editingQid || S.allowedTypes === 'KEDUANYA' || S.role === 'admin') S.formType = d.type;
+    }
+    S.formSoal = d.soal || '';
+    S.formOpts = Object.assign({ A: '', B: '', C: '', D: '', E: '' }, d.opts || {});
+    S.formAnswer = d.answer || ''; S.formAnswers = d.answers || ''; S.formCaseSensitive = !!d.cs;
+    S.formEst = d.est == null ? '' : String(d.est);
+    if (d.batch != null) S.formTargetBatch = Number(d.batch);
+    if (S.role === 'admin' && d.assigned != null) S.formAssigned = !!d.assigned;
+  }
+
   /** Ubah Response fetch jadi JSON dengan aman. Kalau isinya bukan JSON valid
    *  (server sedang sibuk dan sesaat membalas halaman HTML), lempar pesan yang jelas
    *  alih-alih membiarkan SyntaxError mentah bocor ke pengguna. PENTING: tidak
@@ -2208,6 +2262,14 @@
         ? Number(S.currentBatch) : Number(S.quotaBatches[0]);
       S.formEst = ''; S.formImagesKeep = [];
     }
+    var dr = readDraft(qid);
+    S.draftNote = '';
+    if (dr) {
+      applyDraft(dr);
+      S.draftNote = 'Draf yang belum disimpan dipulihkan (' +
+        new Date(dr.t).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) +
+        '). Gambar perlu ditambahkan lagi.';
+    }
     S.screen = 'create'; render();
   }
 
@@ -2341,6 +2403,7 @@
     app.innerHTML = navBar() +
       '<div class="lc-rule"></div><h2>' + (isEdit ? 'Ubah soal ' + esc(S.editingQid) : 'Buat soal baru') + '</h2>' +
       originNote +
+      (S.draftNote ? '<p class="lc-mute lc-hintline">' + esc(S.draftNote) + '</p>' : '') +
       assignToggle +
       batchSelector +
       typeSelector +
@@ -2357,6 +2420,7 @@
       '<div class="lc-fieldset"><label class="lc-label" for="lc-est">Estimasi waktu pengerjaan (detik)</label>' +
       '<input class="lc-input" id="lc-est" type="number" min="' + CONFIG.MIN_EST + '" max="' + CONFIG.MAX_EST + '" value="' + esc(S.formEst) + '">' +
       '<p class="lc-mute lc-hintline">' + CONFIG.MIN_EST + '–' + CONFIG.MAX_EST + ' detik.</p></div>' +
+      (S.formOrigin === 'mine' ? '<p class="lc-mute lc-hintline" id="lc-draftstat" role="status" aria-live="polite">' + DRAFT_IDLE_MSG + '</p>' : '') +
       '<div class="lc-actions lc-row"><button class="lc-btn" id="lc-save">' + (isEdit ? 'Perbarui soal' : 'Simpan soal') + '</button>' +
       '<button class="lc-btn ghost" id="lc-cancel">Batal</button></div>' +
       (S.formErr ? '<p class="lc-err" role="alert">' + esc(S.formErr) + '</p>' : '');
@@ -2454,6 +2518,7 @@
     if (bsel) bsel.onchange = function () { S.formTargetBatch = Number(bsel.value); };
     // Batal / selesai kembali ke tempat asal: daftar soal admin atau "Soal saya".
     app.querySelector('#lc-cancel').onclick = function () {
+      dropDraft(S.editingQid);
       if (fromAdminList) openAdminList();
       else { S.screen = 'mine'; render(); }
     };
@@ -2533,6 +2598,7 @@
       api(isEdit ? 'update' : 'create', payload).then(function (res) {
         S.formBusy = false;
         if (!res.ok) throw new Error(res.error || 'Gagal menyimpan soal.');
+        if (!fromAdminList) dropDraft(editQid);
         if (fromAdminList) {
           // Isi soal berubah, jadi hasil pengecekan / progres lama untuk soal ini tidak berlaku lagi.
           dropProg(editQid);
@@ -2585,6 +2651,13 @@
         onOk: function () { doSave(soal, est); }
       });
     };
+
+    app.querySelectorAll('#lc-soal, #lc-est, #lc-answers, #lc-cs, #lc-batch, textarea.lc-opt-ta, input[name="lc-answer"]')
+      .forEach(function (el) {
+        el.addEventListener('input', saveDraft);
+        el.addEventListener('change', saveDraft);
+      });
+    saveDraft();
   }
 
   /* ====== ANGGOTA: daftar tim ====== */
